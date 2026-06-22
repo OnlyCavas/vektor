@@ -1,0 +1,16 @@
+# Zig build artifacts
+.zig-cache/
+zig-cache/
+zig-out/
+
+# Old global cache name (pre-0.11)
+/cache/
+
+# Zig package manager local cache (if vendored locally)
+.zig/
+
+# Editor / OS noise
+*.swp
+*.swo
+*~
+.DS_Store
