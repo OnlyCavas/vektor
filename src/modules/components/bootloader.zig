@@ -123,7 +123,7 @@ pub const Bootloader = struct {
         const rootPartition = try disk.partDevice(allocator, try disk.getRootIndex());
         defer allocator.free(rootPartition);
 
-        const uuid_raw = try runner.execRead(&.{ "blkid", "-s", "UUID", "-o", "value", rootPartition });
+        const uuid_raw = try runner.execRead(allocator, &.{ "blkid", "-s", "UUID", "-o", "value", rootPartition });
         defer allocator.free(uuid_raw);
 
         const uuid = std.mem.trim(u8, uuid_raw, " \n\r");
@@ -133,7 +133,7 @@ pub const Bootloader = struct {
 
         try runner.writeFile("/mnt/etc/kernel/cmdline", cmdline);
 
-        const listKernels = try runner.execRead(&.{ "ls", "/mnt/lib/modules" });
+        const listKernels = try runner.execRead(allocator, &.{ "ls", "/mnt/lib/modules" });
         defer allocator.free(listKernels);
 
         var names: std.ArrayList([]const u8) = .empty;
@@ -143,7 +143,7 @@ pub const Bootloader = struct {
             const pkgbasePath = try std.fmt.allocPrint(allocator, "/mnt/lib/modules/{s}/pkgbase", .{kernel});
             defer allocator.free(pkgbasePath);
 
-            const pkgbaseRaw = runner.execRead(&.{ "cat", pkgbasePath }) catch continue;
+            const pkgbaseRaw = runner.execRead(allocator, &.{ "cat", pkgbasePath }) catch continue;
             defer allocator.free(pkgbaseRaw);
 
             const kernelName = std.mem.trim(u8, pkgbaseRaw, " \n\r");

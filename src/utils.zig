@@ -108,9 +108,9 @@ pub const Runner = struct {
         try self.checkTerm(try child.wait(io), argv);
     }
 
-    pub fn execRead(self: *Runner, argv: []const []const u8) ExecError![]u8 {
+    pub fn execRead(self: *Runner, allocator: std.mem.Allocator, argv: []const []const u8) ExecError![]u8 {
         const io = self._threaded.io();
-        if (!try self.logCommand(io, argv)) return try self.allocator.dupe(u8, "");
+        if (!try self.logCommand(io, argv)) return try allocator.dupe(u8, "");
 
         var child = try std.process.spawn(io, .{
             .argv = argv,
@@ -121,8 +121,9 @@ pub const Runner = struct {
         var read_buffer: [4096]u8 = undefined;
         var stdout_reader = child.stdout.?.readerStreaming(io, &read_buffer);
 
-        var sink: std.Io.Writer.Allocating = .init(self.allocator);
+        var sink: std.Io.Writer.Allocating = .init(allocator);
         defer sink.deinit();
+
         _ = try stdout_reader.interface.streamRemaining(&sink.writer);
 
         try self.checkTerm(try child.wait(io), argv);

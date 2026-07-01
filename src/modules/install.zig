@@ -26,7 +26,7 @@ pub fn run(ctx: *const Ctx) !void {
     try startServices(ctx);
     try installSystem(ctx.runner, allocator, ctx.packages);
 
-    try fstab(ctx.runner);
+    try fstab(ctx.runner, allocator);
 
     try configureSystem(ctx.runner, allocator, ctx.cfg.system);
     try configureUsers(ctx.runner, allocator, ctx.cfg.system);
@@ -51,8 +51,10 @@ fn installSystem(runner: *Runner, allocator: std.mem.Allocator, packages: []cons
     try runner.exec(argv);
 }
 
-fn fstab(runner: *Runner) !void {
-    const out = try runner.execRead(&.{ "fstabgen", "-U", "/mnt" });
+fn fstab(runner: *Runner, allocator: std.mem.Allocator) !void {
+    const out = try runner.execRead(allocator, &.{ "fstabgen", "-U", "/mnt" });
+    defer allocator.free(out);
+
     try runner.writeFile("/mnt/etc/fstab", out);
 }
 
