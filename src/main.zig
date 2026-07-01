@@ -17,7 +17,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
         if (std.mem.eql(u8, arg, "--dry-run")) dry_run = true;
     }
 
-    var runner: utils.Runner = try .init(allocator, .{
+    var runner: utils.Runner = try .init(allocator, init.environ, .{
         .dry_run = dry_run,
         .log_file_path = "/tmp/artix-installer.log",
     });

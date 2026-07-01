@@ -1,9 +1,5 @@
 const NFTables = struct {
     default_policy: enum { drop, accept } = .drop,
-
-    fn apply(fw: NFTables) !void {
-        _ = fw;
-    }
 };
 
 pub const Firewall = union(enum) {
@@ -17,11 +13,4 @@ pub const Firewall = union(enum) {
             .default_policy = .drop,
         },
     };
-
-    pub fn apply(fw: Firewall) !void {
-        switch (fw) {
-            .nftables => |nftables| try nftables.apply(),
-            .none => {},
-        }
-    }
 };

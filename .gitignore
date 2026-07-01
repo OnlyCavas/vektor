@@ -3,6 +3,9 @@
 zig-cache/
 zig-out/
 
+# local
+assets/
+
 # Old global cache name (pre-0.11)
 /cache/
 
