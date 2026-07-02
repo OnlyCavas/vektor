@@ -13,7 +13,7 @@ OVMF_VARS_SRC="/usr/share/edk2/ovmf/OVMF_VARS.fd"
 
 zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe
 
-[ -f "$DISK" ] || qemu-img create -f qcow2 "$DISK" 20G
+[ -f "$DISK" ] || qemu-img create -f qcow2 "$DISK" 40G
 
 [ -f "$OVMF_VARS" ] || cp "$OVMF_VARS_SRC" "$OVMF_VARS"
 

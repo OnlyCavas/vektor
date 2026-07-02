@@ -1,14 +1,24 @@
 const std = @import("std");
-const lib = @import("lib");
+const builtin = @import("builtin");
 
+const lib = @import("lib");
 const utils = @import("utils");
 
 const ArtixConfiguration = @import("config").Config;
 
 pub fn main(init: std.process.Init.Minimal) !void {
+    const use_gpa = builtin.mode == .Debug;
+
     var gpa: std.heap.DebugAllocator(.{}) = .init;
-    const allocator = gpa.allocator();
-    defer _ = gpa.deinit();
+
+    defer if (use_gpa) {
+        _ = gpa.deinit();
+    };
+
+    const allocator = if (use_gpa)
+        gpa.allocator()
+    else
+        std.heap.smp_allocator;
 
     var dry_run = false;
     var args = init.args.iterate();

@@ -1,9 +1,42 @@
 const std = @import("std");
 
-const Firewall = @import("firewall.zig").Firewall;
+pub const Firewall = @import("firewall.zig").Firewall;
 pub const BootloaderConfig = @import("bootloader.zig").BootLoaderConfig;
 
+pub const HardwareConfig = struct {
+    cpu: enum {
+        intel,
+        amd,
+
+        pub fn ucode(self: @This()) []const u8 {
+            return switch (self) {
+                .intel => "intel-ucode",
+                .amd => "amd-ucode",
+            };
+        }
+    },
+    gpu: enum {
+        intel,
+        amd,
+        nvidia,
+
+        pub fn packages(self: @This()) []const []const u8 {
+            return switch (self) {
+                .intel => &.{ "mesa", "vulkan-intel", "intel-media-driver" },
+                .amd => &.{ "mesa", "vulkan-radeon", "libva-mesa-driver" },
+                .nvidia => &.{ "nvidia-dkms", "nvidia-utils", "dkms" },
+            };
+        }
+    },
+};
+
+pub const PrivilegeEscalationConfig = enum {
+    sudo,
+    doas,
+};
+
 const SecurityConfig = struct {
+    priviledgeEscalation: PrivilegeEscalationConfig = .sudo,
     firewall: Firewall = .default,
     bootloader: BootloaderConfig = .default,
 };
@@ -164,6 +197,7 @@ pub const DiskConfig = struct {
 pub const InstallConfig = struct {
     disk: DiskConfig,
     system: SystemConfig,
+    hardware: HardwareConfig,
     packages: PackageSpec = .{
         .base = &.{},
         .services = &.{},

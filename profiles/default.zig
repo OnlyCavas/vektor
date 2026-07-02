@@ -19,7 +19,7 @@ pub const Config = installer{
             .{
                 .label = "root",
                 .fs = .ext4,
-                .size = .{ .gib = 5 },
+                .size = .{ .gib = 25 },
             },
             .{
                 .label = "home",
@@ -46,10 +46,10 @@ pub const Config = installer{
             },
         },
     },
-    .packages = .{
-        .initSystem = .dinit,
-    },
+    .hardware = .{ .cpu = .intel, .gpu = .nvidia },
+    .packages = .{ .initSystem = .dinit },
     .security = .{
+        .priviledgeEscalation = .doas,
         .firewall = .default,
         .bootloader = .{
             .limine = .{

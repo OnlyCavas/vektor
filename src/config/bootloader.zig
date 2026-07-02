@@ -12,6 +12,14 @@ pub const KernelEntry = struct {
                 .hardened => "linux-hardened",
             };
         }
+
+        pub fn packages(self: @This()) []const []const u8 {
+            return switch (self) {
+                .standard => &.{ "linux", "linux-headers" },
+                .lts => &.{ "linux-lts", "linux-lts-headers" },
+                .hardened => &.{ "linux-hardened", "linux-hardened-headers" },
+            };
+        }
     },
 };
 

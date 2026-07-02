@@ -24,7 +24,7 @@ pub const Bootloader = struct {
                 comptime var base: []const []const u8 = &.{ "limine", "efibootmgr", "dracut", "gummiboot" };
 
                 inline for (lc.entries) |e|
-                    base = base ++ &[_][]const u8{e.package.name()};
+                    base = base ++ e.package.packages();
 
                 return .{ .base = base };
             },
@@ -153,8 +153,6 @@ pub const Bootloader = struct {
             try runner.execChroot(&.{
                 "dracut",
                 "--force",
-                "--uefi",
-                "--no-hostonly",
                 "--uefi",
                 "--add-drivers",
                 "virtio_blk virtio_pci nvme ahci ext4 btrfs",

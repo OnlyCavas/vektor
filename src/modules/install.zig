@@ -3,6 +3,8 @@ const std = @import("std");
 const config = @import("config");
 
 const Bootloader = @import("components/bootloader.zig").Bootloader;
+const Hardware = @import("components/hardware.zig").Hardware;
+const PriviledgeEscalation = @import("components/priviled_escalation.zig").PrivelidgeEscalation;
 
 const Ctx = @import("lib.zig").Context;
 const Runner = @import("utils").Runner;
@@ -10,11 +12,15 @@ const Runner = @import("utils").Runner;
 pub const label = "Installation";
 
 pub const installPackages: config.PackageSpec = .{
-    .base = &.{ "base", "base-devel", "linux-firmware" },
+    .base = &.{ "base", "base-devel", "linux-firmware", "sof-firmware" },
     .services = &.{ "elogind", "networkmanager" },
 };
 
-pub const installComponents = .{Bootloader};
+pub const installComponents = .{
+    Hardware,
+    PriviledgeEscalation,
+    Bootloader,
+};
 
 pub fn run(ctx: *const Ctx) !void {
     var arena: std.heap.ArenaAllocator = .init(ctx.runner.allocator);
@@ -88,10 +94,6 @@ fn configureUsers(runner: *Runner, allocator: std.mem.Allocator, system: config.
         try runner.execChroot(&.{ "useradd", "-m", "-s", user.shell.path(), "-G", groups, user.name });
         try setPassword(runner, allocator, user.name);
     }
-
-    // TODO this is wrong here, must be on priviledge escalation component
-    try runner.writeFile("/mnt/etc/sudoers.d/wheel", "%wheel ALL=(ALL:ALL) ALL\n");
-    try runner.execChroot(&.{ "chmod", "0440", "/etc/sudoers.d/wheel" });
 }
 
 fn setPassword(runner: *Runner, allocator: std.mem.Allocator, name: []const u8) !void {
