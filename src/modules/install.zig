@@ -5,6 +5,7 @@ const config = @import("config");
 const Bootloader = @import("components/bootloader.zig").Bootloader;
 const Hardware = @import("components/hardware.zig").Hardware;
 const PriviledgeEscalation = @import("components/priviled_escalation.zig").PrivelidgeEscalation;
+const Firewall = @import("components/firewall.zig").Firewall;
 
 const Ctx = @import("lib.zig").Context;
 const Runner = @import("utils").Runner;
@@ -13,10 +14,11 @@ pub const label = "Installation";
 
 pub const installPackages: config.PackageSpec = .{
     .base = &.{ "base", "base-devel", "linux-firmware", "sof-firmware" },
-    .services = &.{ "elogind", "networkmanager" },
+    .services = &.{ "elogind", "networkmanager", "dhcpcd" },
 };
 
 pub const installComponents = .{
+    Firewall,
     Hardware,
     PriviledgeEscalation,
     Bootloader,
@@ -27,7 +29,7 @@ pub fn run(ctx: *const Ctx) !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    // setup mirriors
+    // TODO setup mirriors
 
     try startServices(ctx);
     try installSystem(ctx.runner, allocator, ctx.packages);

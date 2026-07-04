@@ -50,7 +50,30 @@ pub const Config = installer{
     .packages = .{ .initSystem = .dinit },
     .security = .{
         .priviledgeEscalation = .doas,
-        .firewall = .default,
+        .firewall = .{
+            .nftables = .{
+                .lanCluster = &.{
+                    .{ .label = "homelab", .maskList = &.{"10.0.1.0/24"} },
+                },
+                .input = .{
+                    .policy = .drop,
+                    .rules = &.{
+                        .{
+                            .clusterLabel = "homelab",
+                            .extend = "icmp type echo-request",
+                            .policy = .accept,
+                        },
+                        .{
+                            .clusterLabel = "homelab",
+                            .protocol = .tcp,
+                            .dport = "22",
+                            .extend = "ct state new limit rate 5/minute",
+                            .policy = .accept,
+                        },
+                    },
+                },
+            },
+        },
         .bootloader = .{
             .limine = .{
                 .withWindows = .{ .label = "Gaming Machine" },

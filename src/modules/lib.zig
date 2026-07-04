@@ -116,7 +116,6 @@ fn installComponents(comptime M: type, ctx: *const Context) !void {
 
 const disk = @import("disk.zig");
 const install = @import("install.zig");
-const hardened = @import("hardened.zig");
 
 const modules = .{
     disk,
@@ -157,6 +156,9 @@ pub fn runAll(runner: *Runner, comptime cfg: InstallConfig) !void {
         };
 
         if (@hasDecl(m, "installComponents")) try installComponents(m, &ctx);
-        if (@hasDecl(m, "postInstall")) try m.postInstall(runner, cfg);
+    }
+
+    for (specs.services) |services| {
+        try ctx.services().enable(services);
     }
 }

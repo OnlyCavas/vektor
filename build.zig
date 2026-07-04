@@ -17,6 +17,9 @@ pub fn build(b: *std.Build) void {
 
     const metadata = b.createModule(.{
         .root_source_file = b.path("src/metadata/lib.zig"),
+        .imports = &.{
+            .{ .name = "config", .module = config_types_mod },
+        },
     });
 
     const lib = b.createModule(.{
