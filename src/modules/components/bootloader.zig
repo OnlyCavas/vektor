@@ -104,7 +104,7 @@ pub const Bootloader = struct {
         try runner.execChroot(&.{
             "limine",
             "enroll-config",
-            "/boot/limine/BOOX64.EFI",
+            "/boot/limine/BOOTX64.EFI",
             limineConfigHash,
         });
     }

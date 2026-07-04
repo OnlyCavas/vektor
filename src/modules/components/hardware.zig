@@ -14,11 +14,19 @@ pub const Hardware = struct {
     }
 
     pub fn spec(self: Hardware) PackageSpec {
-        return .{ .base = &[_][]const u8{self.cfg.cpu.ucode()} ++ self.cfg.gpu.packages() };
+        const gpu_pkgs: []const []const u8 = switch (self.cfg.gpu) {
+            .intel => &.{ "mesa", "vulkan-intel", "intel-media-driver" },
+            .amd => &.{ "mesa", "vulkan-radeon", "libva-mesa-driver" },
+            .nvidia => &.{ "nvidia-open-dkms", "nvidia-utils", "dkms" },
+        };
+
+        const microcode = switch (self.cfg.cpu) {
+            .intel => "intel-ucode",
+            .amd => "amd-ucode",
+        };
+
+        return .{ .base = &[_][]const u8{microcode} ++ gpu_pkgs };
     }
 
-    pub fn install(self: Hardware, ctx: *const Ctx) !void {
-        _ = self;
-        _ = ctx;
-    }
+    pub fn install(_: Hardware, _: *const Ctx) !void {}
 };

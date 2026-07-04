@@ -7,26 +7,11 @@ pub const HardwareConfig = struct {
     cpu: enum {
         intel,
         amd,
-
-        pub fn ucode(self: @This()) []const u8 {
-            return switch (self) {
-                .intel => "intel-ucode",
-                .amd => "amd-ucode",
-            };
-        }
     },
     gpu: enum {
         intel,
         amd,
         nvidia,
-
-        pub fn packages(self: @This()) []const []const u8 {
-            return switch (self) {
-                .intel => &.{ "mesa", "vulkan-intel", "intel-media-driver" },
-                .amd => &.{ "mesa", "vulkan-radeon", "libva-mesa-driver" },
-                .nvidia => &.{ "nvidia-dkms", "nvidia-utils", "dkms" },
-            };
-        }
     },
 };
 
