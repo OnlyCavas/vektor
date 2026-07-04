@@ -1,8 +1,7 @@
 const std = @import("std");
 
 pub const firewall = @import("firewall.zig");
-
-pub const BootloaderConfig = @import("bootloader.zig").BootLoaderConfig;
+pub const bootloader = @import("bootloader.zig");
 
 pub const HardwareConfig = struct {
     cpu: enum {
@@ -39,7 +38,7 @@ pub const PrivilegeEscalationConfig = enum {
 const SecurityConfig = struct {
     priviledgeEscalation: PrivilegeEscalationConfig = .sudo,
     firewall: firewall.Firewall = .default,
-    bootloader: BootloaderConfig = .default,
+    bootloader: bootloader.BootLoaderConfig = .default,
 };
 
 pub const Shell = enum {

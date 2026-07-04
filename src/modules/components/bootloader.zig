@@ -1,15 +1,22 @@
 const std = @import("std");
 const config = @import("config");
-
-const LimineConfigFile = @import("metadata").LimineConfigFile;
+const bootloaderConfig = @import("config").bootloader;
 
 const InstallConfig = config.InstallConfig;
 const DiskConfig = config.DiskConfig;
-const BootloaderConfig = config.BootloaderConfig;
 const PackageSpec = config.PackageSpec;
+
+const BootloaderConfig = bootloaderConfig.BootLoaderConfig;
+const LimineConfig = bootloaderConfig.LimineConfig;
+const LimineConfigFile = @import("metadata").LimineConfigFile;
 
 const Ctx = @import("../lib.zig").Context;
 const Runner = @import("utils").Runner;
+
+const UnifiedKernelImage = struct {
+    kernelLabel: []const u8,
+    blake2Hash: []const u8,
+};
 
 pub const Bootloader = struct {
     cfg: BootloaderConfig,
@@ -19,14 +26,18 @@ pub const Bootloader = struct {
     }
 
     pub fn spec(self: Bootloader) PackageSpec {
+        comptime var base: []const []const u8 = &.{
+            "efibootmgr",
+            "dracut",
+            "gummiboot",
+        };
+
         switch (self.cfg) {
             .limine => |lc| {
-                comptime var base: []const []const u8 = &.{ "limine", "efibootmgr", "dracut", "gummiboot" };
-
                 inline for (lc.entries) |e|
                     base = base ++ e.package.packages();
 
-                return .{ .base = base };
+                return .{ .base = base ++ [_][]const u8{"limine"} };
             },
         }
     }
@@ -45,46 +56,71 @@ pub const Bootloader = struct {
 
         const kernelImages = try createUFIimages(runner, allocator, cfg.disk);
 
-        switch (self.cfg) {
-            .limine => {
-                const limineConfig = self.cfg.limine;
-
-                try runner.exec(&.{ "mkdir", "-p", "/mnt/boot/limine" });
-
-                try self.writeConfigFile(runner, allocator, kernelImages);
-
-                try runner.exec(&.{
-                    "cp",
-                    "/mnt/usr/share/limine/BOOTX64.EFI",
-                    "/mnt/boot/limine/BOOTX64.EFI",
-                });
-
-                const partition = try std.fmt.allocPrint(allocator, "{d}", .{try ctx.cfg.disk.getEFI()});
-                defer allocator.free(partition);
-
-                try runner.exec(&.{
-                    "efibootmgr", "--create",
-                    "--disk",     cfg.disk.device,
-                    "--part",     partition,
-                    "--label",    limineConfig.bootEntryName,
-                    "--loader",   "/limine/BOOTX64.EFI",
-                });
-            },
-        }
+        try switch (self.cfg) {
+            .limine => |lc| self.setupLimine(
+                ctx,
+                allocator,
+                kernelImages,
+                lc,
+            ),
+        };
     }
 
-    fn contains(haystack: []const []const u8, needle: []const u8) bool {
-        for (haystack) |h|
-            if (std.mem.eql(u8, h, needle)) return true;
+    fn setupLimine(
+        self: Bootloader,
+        ctx: *const Ctx,
+        allocator: std.mem.Allocator,
+        kernelImages: []const UnifiedKernelImage,
+        lc: LimineConfig,
+    ) !void {
+        const runner = ctx.runner;
 
-        return false;
+        try runner.exec(&.{ "mkdir", "-p", "/mnt/boot/limine" });
+        try self.writeConfigFile(runner, allocator, kernelImages);
+
+        try runner.exec(&.{
+            "cp",
+            "/mnt/usr/share/limine/BOOTX64.EFI",
+            "/mnt/boot/limine/BOOTX64.EFI",
+        });
+
+        const partition = try std.fmt.allocPrint(allocator, "{d}", .{try ctx.cfg.disk.getEFI()});
+        defer allocator.free(partition);
+
+        try runner.exec(&.{
+            "efibootmgr", "--create",
+            "--disk",     ctx.cfg.disk.device,
+            "--part",     partition,
+            "--label",    lc.bootEntryName,
+            "--loader",   "/limine/BOOTX64.EFI",
+        });
+
+        const limineConfigHash = try b2sum(
+            "/boot/limine/limine.conf",
+            runner,
+            allocator,
+        );
+
+        try runner.execChroot(&.{
+            "limine",
+            "enroll-config",
+            "/boot/limine/BOOX64.EFI",
+            limineConfigHash,
+        });
+    }
+
+    fn getKernel(haystack: []const UnifiedKernelImage, needle: []const u8) ?UnifiedKernelImage {
+        for (haystack) |h|
+            if (std.mem.eql(u8, h.kernelLabel, needle)) return h;
+
+        return null;
     }
 
     fn writeConfigFile(
         self: Bootloader,
         runner: *Runner,
         allocator: std.mem.Allocator,
-        kernels: []const []const u8,
+        kernels: []const UnifiedKernelImage,
     ) !void {
         switch (self.cfg) {
             .limine => |lc| {
@@ -95,13 +131,16 @@ pub const Bootloader = struct {
 
                 for (lc.entries) |entry| {
                     const pkg = entry.package.name();
-
-                    if (!contains(kernels, pkg)) continue;
+                    const kernel = getKernel(kernels, pkg) orelse continue;
 
                     try conf.appendSlice(allocator, try std.fmt.allocPrint(
                         allocator,
-                        "/{s}\n    protocol: efi_chainload\n    path: boot():/EFI/Linux/{s}.efi\n\n",
-                        .{ entry.label, pkg },
+                        "/{s}\n    protocol: efi_chainload\n    path: boot():/EFI/Linux/{s}.efi#{s}\n\n",
+                        .{
+                            entry.label,
+                            kernel.kernelLabel,
+                            kernel.blake2Hash,
+                        },
                     ));
                 }
 
@@ -117,7 +156,7 @@ pub const Bootloader = struct {
         }
     }
 
-    fn createUFIimages(runner: *Runner, allocator: std.mem.Allocator, disk: DiskConfig) ![]const []const u8 {
+    fn createUFIimages(runner: *Runner, allocator: std.mem.Allocator, disk: DiskConfig) ![]const UnifiedKernelImage {
         try runner.exec(&.{ "mkdir", "-p", "/mnt/boot/EFI/Linux" });
 
         const rootPartition = try disk.partDevice(allocator, try disk.getRootIndex());
@@ -136,7 +175,7 @@ pub const Bootloader = struct {
         const listKernels = try runner.execRead(allocator, &.{ "ls", "/mnt/lib/modules" });
         defer allocator.free(listKernels);
 
-        var names: std.ArrayList([]const u8) = .empty;
+        var images: std.ArrayList(UnifiedKernelImage) = .empty;
         var token = std.mem.tokenizeAny(u8, listKernels, " \n\r");
 
         while (token.next()) |kernel| {
@@ -163,9 +202,25 @@ pub const Bootloader = struct {
                 efiX64,
             });
 
-            try names.append(allocator, try allocator.dupe(u8, kernelName));
+            try images.append(allocator, .{
+                .kernelLabel = try allocator.dupe(u8, kernelName),
+                .blake2Hash = try b2sum(efiX64, runner, allocator),
+            });
         }
 
-        return names.items;
+        return images.items;
+    }
+
+    fn b2sum(ufiPath: []const u8, runner: *Runner, allocator: std.mem.Allocator) ![]const u8 {
+        const hostEfiPath = try std.fmt.allocPrint(allocator, "/mnt{s}", .{ufiPath});
+        defer allocator.free(hostEfiPath);
+
+        if (runner.options.dry_run) return "b2sum_hash";
+
+        const raw = try runner.execRead(allocator, &.{ "b2sum", hostEfiPath });
+        defer allocator.free(raw);
+
+        const hash_end = std.mem.indexOfScalar(u8, raw, ' ') orelse return error.UnexpectedB2sumOutput;
+        return allocator.dupe(u8, raw[0..hash_end]);
     }
 };

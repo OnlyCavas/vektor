@@ -85,8 +85,11 @@ fn configureSystem(runner: *Runner, allocator: std.mem.Allocator, system: config
     try runner.writeFile("/mnt/etc/hostname", host);
 }
 
+// NOTE feat: encrypt passwords and unencrypted it while installing
 fn configureUsers(runner: *Runner, allocator: std.mem.Allocator, system: config.SystemConfig) !void {
     try setPassword(runner, allocator, "root");
+
+    // TODO move to hardned
     try runner.execChroot(&.{ "passwd", "-l", "root" });
 
     for (system.users) |user| {
