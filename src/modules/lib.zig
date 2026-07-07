@@ -116,10 +116,12 @@ fn installComponents(comptime M: type, ctx: *const Context) !void {
 
 const disk = @import("disk.zig");
 const install = @import("install.zig");
+const extra = @import("extra.zig");
 
 const modules = .{
     disk,
     install,
+    extra,
 };
 
 comptime {

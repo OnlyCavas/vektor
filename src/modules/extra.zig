@@ -2,6 +2,8 @@ const std = @import("std");
 
 const config = @import("config");
 
+const Repositories = @import("components/repositories.zig").Repositories;
+
 const Ctx = @import("lib.zig").Context;
 const Runner = @import("utils").Runner;
 
@@ -12,7 +14,7 @@ pub const installPackages: config.PackageSpec = .{
     .services = &.{},
 };
 
-pub const installComponents = .{};
+pub const installComponents = .{Repositories};
 
 pub fn run(ctx: *const Ctx) !void {
     var arena: std.heap.ArenaAllocator = .init(ctx.runner.allocator);

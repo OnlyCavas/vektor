@@ -156,4 +156,18 @@ pub const Runner = struct {
         try writer.interface.writeAll(contents);
         try writer.interface.flush();
     }
+
+    pub fn appendFile(self: *Runner, path: []const u8, contents: []const u8) !void {
+        const io = self._threaded.io();
+        if (!try self.logCommand(io, &.{ "append", path })) return;
+
+        if (std.fs.path.dirname(path)) |dir|
+            try std.Io.Dir.cwd().createDirPath(io, dir);
+
+        const file = try std.Io.Dir.createFileAbsolute(io, path, .{ .truncate = false });
+        defer file.close(io);
+
+        const end = try file.length(io);
+        try file.writePositionalAll(io, contents, end);
+    }
 };

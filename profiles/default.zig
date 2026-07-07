@@ -48,6 +48,9 @@ pub const Config = installer{
     },
     .hardware = .{ .cpu = .intel, .gpu = .nvidia },
     .packages = .{ .initSystem = .dinit },
+    .repositories = .{
+        .enable_arch = &.{ .extra, .multilib },
+    },
     .security = .{
         .priviledgeEscalation = .doas,
         .firewall = .{

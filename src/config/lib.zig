@@ -179,6 +179,19 @@ pub const DiskConfig = struct {
     }
 };
 
+pub const ArchRepositories = enum {
+    extra,
+    multilib,
+
+    pub fn getName(self: ArchRepositories) []const u8 {
+        return @tagName(self);
+    }
+};
+
+pub const RepositoryConfig = struct {
+    enable_arch: ?[]const ArchRepositories = null,
+};
+
 pub const InstallConfig = struct {
     disk: DiskConfig,
     system: SystemConfig,
@@ -188,5 +201,6 @@ pub const InstallConfig = struct {
         .services = &.{},
         .initSystem = .runit,
     },
+    repositories: RepositoryConfig,
     security: SecurityConfig,
 };
