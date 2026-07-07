@@ -7,7 +7,7 @@ const InstallConfig = config.InstallConfig;
 const Runner = @import("utils").Runner;
 const Ctx = @import("../lib.zig").Context;
 
-const doas_conf = "permit setenv { PATH=/usr/local/bin:/usr/local/sbin:/usr/sbin } :wheel\n";
+const doas_conf = "permit persist setenv { PATH=/usr/local/bin:/usr/local/sbin:/usr/sbin } :wheel\n";
 const sudoers_wheel = "%wheel ALL=(ALL:ALL) ALL\n";
 
 pub const PrivelidgeEscalation = struct {
