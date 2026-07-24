@@ -33,6 +33,14 @@ pub const Config = installer{
             .{ .partition = "home", .target = "/home" },
         },
     },
+    .desktop = .{
+        .desktopPortal = &.{
+            .cosmic,
+            .wlr,
+        },
+        .windowManager = .niri,
+        .audio = .pipewire,
+    },
     .system = .{
         .hostname = "citadel",
         .timezone = "Europe/Lisbon",
@@ -43,11 +51,18 @@ pub const Config = installer{
                 .name = "cavas",
                 .shell = .zsh,
                 .groups = &.{ "wheel", "audio", "video" },
+                .dotfiles = .{
+                    .git = "https://github.com/OnlyCavas/dotfiles.git",
+                    .commit = "91de7b1fdf64b27a61acab922e8e730b864dea3d",
+                    .entryPoint = .fnl,
+                },
             },
         },
     },
-    .hardware = .{ .cpu = .intel, .gpu = .nvidia },
-    .packages = .{ .initSystem = .dinit },
+    .hardware = .{ .cpu = .intel, .gpu = .virtual },
+    .packages = .{
+        .initSystem = .dinit,
+    },
     .repositories = .{
         .enable_arch = &.{ .extra, .multilib },
     },

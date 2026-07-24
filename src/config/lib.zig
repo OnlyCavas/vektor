@@ -12,6 +12,16 @@ pub const HardwareConfig = struct {
         intel,
         amd,
         nvidia,
+        virtual,
+    },
+};
+
+pub const DotfilesConfig = struct {
+    git: []const u8,
+    commit: ?[]const u8,
+    entryPoint: union(enum) {
+        script: []const u8,
+        fnl,
     },
 };
 
@@ -48,6 +58,7 @@ const User = struct {
     name: []const u8,
     shell: Shell = .bash,
     groups: []const []const u8 = &.{ "wheel", "audio", "video" },
+    dotfiles: ?DotfilesConfig = null,
 };
 
 pub const SystemConfig = struct {
@@ -57,6 +68,12 @@ pub const SystemConfig = struct {
     keymap: []const u8,
 
     users: []const User,
+
+    pub fn primaryUser(self: SystemConfig) !User {
+        if (self.users.len == 0) return error.NoUsers;
+
+        return self.users[0];
+    }
 };
 
 pub const InitSystem = enum {
@@ -65,14 +82,41 @@ pub const InitSystem = enum {
     openrc,
     s6,
 
+    pub fn enable(self: InitSystem, service: []const u8, allocator: std.mem.Allocator) !void {
+        const dir = switch (self) {
+            .dint => "/etc/dinit.d/{s}",
+            .runit => "/etc/runit/sv/{s}",
+            .s6 => "/etc/s6/adminsv/default/contents.d/{s}",
+        };
+
+        const target = try std.fmt.allocPrint(allocator, dir, .{service});
+        defer allocator.free(target);
+
+        return switch (self) {
+            .runit => &.{ "ln", "-sf", target, "/etc/runit/runsvdir/default/" },
+            .dinit => &.{ "ln", "-sf", target, "/etc/dinit.d/boot.d/" },
+            .s6 => &.{ "touch", target },
+        };
+    }
+
     pub fn suffix(self: InitSystem) []const u8 {
         return @tagName(self);
     }
 };
 
+pub const ServiceSpec = struct {
+    pkg: []const u8,
+    name: ?[]const u8 = null,
+    scope: enum { boot, user } = .boot,
+
+    pub fn service(self: ServiceSpec) []const u8 {
+        return self.name orelse self.pkg;
+    }
+};
+
 pub const PackageSpec = struct {
     base: []const []const u8 = &.{},
-    services: []const []const u8 = &.{},
+    services: []const ServiceSpec = &.{},
     initSystem: InitSystem = .dinit,
 
     pub fn merge(comptime specs: []const PackageSpec) PackageSpec {
@@ -90,13 +134,14 @@ pub const PackageSpec = struct {
     }
 
     fn dedup(comptime pkgs: []const []const u8) []const []const u8 {
+        @setEvalBranchQuota(10_000);
+
         comptime var out: []const []const u8 = &[_][]const u8{};
 
         outer: inline for (pkgs) |p| {
             inline for (out) |q| {
                 if (std.mem.eql(u8, p, q)) continue :outer;
             }
-
             out = out ++ &[_][]const u8{p};
         }
 
@@ -108,7 +153,10 @@ pub const PackageSpec = struct {
             var out: []const []const u8 = spec.base ++ &[_][]const u8{spec.initSystem.suffix()};
 
             for (spec.services) |service| {
-                out = out ++ &[_][]const u8{ service, service ++ "-" ++ spec.initSystem.suffix() };
+                out = out ++ &[_][]const u8{
+                    service.pkg,
+                    service.pkg ++ "-" ++ spec.initSystem.suffix(),
+                };
             }
 
             return dedup(out);
@@ -192,7 +240,37 @@ pub const RepositoryConfig = struct {
     enable_arch: ?[]const ArchRepositories = null,
 };
 
+pub const WindowManagerConfig = enum {
+    niri,
+    hyprland,
+
+    pub fn getName(self: WindowManagerConfig) []const u8 {
+        return @tagName(self);
+    }
+};
+
+pub const DesktopPortalConfig = enum {
+    cosmic,
+    wlr,
+    hyprland,
+    gnome,
+    gtk,
+};
+
+pub const AudioBackendConfig = enum {
+    pipewire,
+    pulseaudio,
+    none,
+};
+
+pub const DesktopConfig = struct {
+    windowManager: WindowManagerConfig = .niri,
+    desktopPortal: []const DesktopPortalConfig = &.{},
+    audio: AudioBackendConfig = .pipewire,
+};
+
 pub const InstallConfig = struct {
+    desktop: DesktopConfig,
     disk: DiskConfig,
     system: SystemConfig,
     hardware: HardwareConfig,

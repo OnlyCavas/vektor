@@ -1,20 +1,24 @@
 const std = @import("std");
 
 const config = @import("config");
+const Runner = @import("utils").Runner;
 
 const Bootloader = @import("components/bootloader.zig").Bootloader;
+const Firewall = @import("components/firewall.zig").Firewall;
 const Hardware = @import("components/hardware.zig").Hardware;
 const PriviledgeEscalation = @import("components/priviled_escalation.zig").PrivelidgeEscalation;
-const Firewall = @import("components/firewall.zig").Firewall;
-
 const Ctx = @import("lib.zig").Context;
-const Runner = @import("utils").Runner;
 
 pub const label = "Installation";
 
 pub const installPackages: config.PackageSpec = .{
     .base = &.{ "base", "base-devel", "linux-firmware", "sof-firmware" },
-    .services = &.{ "elogind", "networkmanager", "dhcpcd" },
+    .services = &.{
+        .{ .pkg = "elogind" },
+        .{ .pkg = "networkmanager", .name = "NetworkManager" },
+        .{ .pkg = "turnstile", .name = "turnstiled" },
+        .{ .pkg = "ly", .name = "ly" }, // TODO hardcoded display manager
+    },
 };
 
 pub const installComponents = .{
@@ -38,6 +42,9 @@ pub fn run(ctx: *const Ctx) !void {
 
     try configureSystem(ctx.runner, allocator, ctx.cfg.system);
     try configureUsers(ctx.runner, allocator, ctx.cfg.system);
+
+    // HACK only works for dinit
+    try configureDisplayManager(ctx.runner);
 }
 
 fn startServices(ctx: *const Ctx) !void {
@@ -137,4 +144,12 @@ fn readPassword(prompt: []const u8, out: []u8) ![]const u8 {
     if (len > 0 and out[len - 1] == '\n') len -= 1;
 
     return out[0..len];
+}
+
+// NOTE this should be it's own component to support more then one Display Manager
+fn configureDisplayManager(runner: *Runner) !void {
+    try runner.exec(&.{
+        "sed",                                                      "-i",
+        "s|^ACTIVE_CONSOLES=.*|ACTIVE_CONSOLES=\"/dev/tty[2-6]\"|", "/mnt/etc/dinit.d/config/console.conf",
+    });
 }

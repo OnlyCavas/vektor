@@ -20,7 +20,9 @@ pub const Firewall = struct {
         return switch (self.cfg) {
             .none => .{},
             .nftables => .{
-                .services = &.{"nftables"},
+                .services = &.{
+                    .{ .pkg = "nftables" },
+                },
             },
         };
     }

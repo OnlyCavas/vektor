@@ -22,6 +22,8 @@ qemu-system-x86_64 \
   -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" \
   -drive if=pflash,format=raw,file="$OVMF_VARS" \
   -drive file="$DISK",if=virtio \
+  -device virtio-vga-gl \
+  -display gtk,gl=on \
   -cdrom "$ISO" -boot menu=on \
   -virtfs local,path="$PWD/zig-out/bin",mount_tag=host,security_model=none \
-  -net nic -net user
+  -nic user,model=virtio-net-pci

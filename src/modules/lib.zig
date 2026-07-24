@@ -4,43 +4,157 @@ const config = @import("config");
 const meta = @import("std").meta;
 
 const Runner = @import("utils").Runner;
+
 const InstallConfig = config.InstallConfig;
 const InitSystem = config.InitSystem;
 const PackageSpec = config.PackageSpec;
+const ServiceSpec = config.ServiceSpec;
 
 pub const Services = struct {
     runner: *Runner,
     init: InitSystem,
 
-    pub fn enable(self: Services, service: []const u8) !void {
-        const allocator = self.runner.allocator;
+    pub fn initUserDir(self: Services, allocator: std.mem.Allocator, username: []const u8) !?[]const u8 {
+        return switch (self.init) {
+            .dinit => try std.fmt.allocPrint(allocator, "/home/{s}/.config/dinit.d", .{username}),
+            .runit => try std.fmt.allocPrint(allocator, "/home/{s}/.runit/sv", .{username}),
+            else => null,
+        };
+    }
+
+    pub fn ensureInitConfig(self: Services, allocator: std.mem.Allocator, username: []const u8) !void {
+        const baseDir = (try self.initUserDir(allocator, username)) orelse return;
+        defer allocator.free(baseDir);
 
         switch (self.init) {
-            .openrc => try self.runner.execChroot(&.{ "rc-update", "add", service, "default" }),
-            .runit => {
-                const target = try std.fmt.allocPrint(allocator, "/etc/runit/sv/{s}", .{service});
-                defer allocator.free(target);
-
-                try self.runner.execChroot(&.{ "ln", "-sf", target, "/etc/runit/runsvdir/default/" });
-            },
             .dinit => {
-                const target = try std.fmt.allocPrint(allocator, "/etc/dinit.d/{s}", .{service});
-                defer allocator.free(target);
+                const bootd = try std.fmt.allocPrint(allocator, "{s}/boot.d", .{baseDir});
+                defer allocator.free(bootd);
 
-                const link = try std.fmt.allocPrint(allocator, "/etc/dinit.d/boot.d/{s}", .{service});
-                defer allocator.free(link);
+                const owner = try std.fmt.allocPrint(allocator, "{s}:{s}", .{ username, username });
+                defer allocator.free(owner);
 
-                try self.runner.execChroot(&.{ "ln", "-sf", target, link });
+                try self.runner.execChroot(&.{ "mkdir", "-p", bootd });
             },
-            .s6 => {
-                const marker = try std.fmt.allocPrint(allocator, "/etc/s6/adminsv/default/contents.d/{s}", .{service});
-                defer allocator.free(marker);
-
-                try self.runner.execChroot(&.{ "touch", marker });
-                try self.runner.execChroot(&.{"s6-db-reload"});
+            .runit => {
+                try self.runner.execChroot(&.{ "mkdir", "-p", baseDir });
             },
+            else => {},
         }
     }
+
+    pub fn chownInitConfig(self: Services, allocator: std.mem.Allocator, username: []const u8) !void {
+        const baseDir = (try self.initUserDir(allocator, username)) orelse return;
+        defer allocator.free(baseDir);
+
+        switch (self.init) {
+            .dinit => {
+                const owner = try std.fmt.allocPrint(allocator, "{s}:{s}", .{ username, username });
+                defer allocator.free(owner);
+
+                try self.runner.execChroot(&.{ "chown", "-R", owner, baseDir });
+            },
+            .runit => {
+                const owner = try std.fmt.allocPrint(allocator, "{s}:{s}", .{ username, username });
+                defer allocator.free(owner);
+
+                try self.runner.execChroot(&.{ "chown", "-R", owner, baseDir });
+            },
+            else => {},
+        }
+    }
+
+    pub fn enableService(self: Services, service: ServiceSpec, user: []const u8) !void {
+        var arena: std.heap.ArenaAllocator = .init(self.runner.allocator);
+        defer arena.deinit();
+        const allocator = arena.allocator();
+        const serviceName = service.service();
+
+        switch (self.init) {
+            .runit => {
+                const runitBaseDir = "/etc/runit/sv";
+                const target = try std.fmt.allocPrint(allocator, "{s}/{s}", .{
+                    runitBaseDir,
+                    serviceName,
+                });
+
+                switch (service.scope) {
+                    .boot => {
+                        try self.runner.execChroot(&.{ "ln", "-sf", target, "/etc/runit/runsvdir/default/" });
+                    },
+                    .user => {
+                        const baseDir = (try self.initUserDir(allocator, user)) orelse return;
+                        try self.runner.execChroot(&.{ "ln", "-sf", target, baseDir });
+                    },
+                }
+            },
+            .dinit => {
+                const dinitBase = "/etc/dinit.d";
+
+                switch (service.scope) {
+                    .boot => {
+                        const target = try std.fmt.allocPrint(allocator, "{s}/{s}", .{
+                            dinitBase,
+                            serviceName,
+                        });
+
+                        const link = try std.fmt.allocPrint(allocator, "{s}/boot.d", .{
+                            dinitBase,
+                        });
+
+                        try self.runner.execChroot(&.{ "ln", "-sf", target, link });
+                    },
+                    .user => {
+                        const target = try std.fmt.allocPrint(allocator, "{s}/user/{s}", .{
+                            dinitBase,
+                            serviceName,
+                        });
+
+                        const baseDir = (try self.initUserDir(allocator, user)) orelse return;
+
+                        const userBaseDir = try std.fmt.allocPrint(
+                            allocator,
+                            "{s}/boot.d",
+                            .{baseDir},
+                        );
+
+                        try self.runner.execChroot(&.{ "ln", "-sf", target, userBaseDir });
+                    },
+                }
+            },
+            else => {},
+        }
+    }
+
+    // pub fn enable(self: Services, service: []const u8) !void {
+    //     const allocator = self.runner.allocator;
+    //
+    //     switch (self.init) {
+    //         .openrc => try self.runner.execChroot(&.{ "rc-update", "add", service, "default" }),
+    //         .runit => {
+    //             const target = try std.fmt.allocPrint(allocator, "/etc/runit/sv/{s}", .{service});
+    //             defer allocator.free(target);
+    //
+    //             try self.runner.execChroot(&.{ "ln", "-sf", target, "/etc/runit/runsvdir/default/" });
+    //         },
+    //         .dinit => {
+    //             const target = try std.fmt.allocPrint(allocator, "/etc/dinit.d/{s}", .{service});
+    //             defer allocator.free(target);
+    //
+    //             const link = try std.fmt.allocPrint(allocator, "/etc/dinit.d/boot.d/{s}", .{service});
+    //             defer allocator.free(link);
+    //
+    //             try self.runner.execChroot(&.{ "ln", "-sf", target, link });
+    //         },
+    //         .s6 => {
+    //             const marker = try std.fmt.allocPrint(allocator, "/etc/s6/adminsv/default/contents.d/{s}", .{service});
+    //             defer allocator.free(marker);
+    //
+    //             try self.runner.execChroot(&.{ "touch", marker });
+    //             try self.runner.execChroot(&.{"s6-db-reload"});
+    //         },
+    //     }
+    // }
 
     pub fn start(self: Services, service: []const u8) !void {
         switch (self.init) {
@@ -136,7 +250,10 @@ pub fn runAll(runner: *Runner, comptime cfg: InstallConfig) !void {
             base = base ++ &[_][]const u8{user.shell.getPackageName()};
         }
 
-        break :blk PackageSpec{ .base = base };
+        break :blk PackageSpec{
+            .base = base,
+            .initSystem = cfg.packages.initSystem,
+        };
     };
 
     const specs = comptime PackageSpec.merge(
@@ -160,7 +277,15 @@ pub fn runAll(runner: *Runner, comptime cfg: InstallConfig) !void {
         if (@hasDecl(m, "installComponents")) try installComponents(m, &ctx);
     }
 
-    for (specs.services) |services| {
-        try ctx.services().enable(services);
-    }
+    const primary = try cfg.system.primaryUser();
+    try enableServices(&ctx, specs, primary.name);
+}
+
+fn enableServices(ctx: *const Context, specs: PackageSpec, username: []const u8) !void {
+    try ctx.services().ensureInitConfig(ctx.runner.allocator, username);
+
+    for (specs.services) |service|
+        try ctx.services().enableService(service, username);
+
+    try ctx.services().chownInitConfig(ctx.runner.allocator, username);
 }

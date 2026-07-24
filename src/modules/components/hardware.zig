@@ -18,6 +18,7 @@ pub const Hardware = struct {
             .intel => &.{ "mesa", "vulkan-intel", "intel-media-driver" },
             .amd => &.{ "mesa", "vulkan-radeon", "libva-mesa-driver" },
             .nvidia => &.{ "nvidia-open-dkms", "nvidia-utils", "dkms" },
+            .virtual => &.{"mesa"},
         };
 
         const microcode = switch (self.cfg.cpu) {
