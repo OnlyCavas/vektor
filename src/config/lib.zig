@@ -58,7 +58,6 @@ const User = struct {
     name: []const u8,
     shell: Shell = .bash,
     groups: []const []const u8 = &.{ "wheel", "audio", "video" },
-    dotfiles: ?DotfilesConfig = null,
 };
 
 pub const SystemConfig = struct {
@@ -84,7 +83,7 @@ pub const InitSystem = enum {
 
     pub fn enable(self: InitSystem, service: []const u8, allocator: std.mem.Allocator) !void {
         const dir = switch (self) {
-            .dint => "/etc/dinit.d/{s}",
+            .dinit => "/etc/dinit.d/{s}",
             .runit => "/etc/runit/sv/{s}",
             .s6 => "/etc/s6/adminsv/default/contents.d/{s}",
         };
@@ -207,12 +206,19 @@ pub const DiskConfig = struct {
         return error.NoRootMount;
     }
 
-    pub fn getEFI(disk: DiskConfig) !usize {
+    pub fn getEFIndex(disk: DiskConfig) !usize {
         for (disk.partitions, 1..) |partition, index|
             for (partition.flags) |flag|
                 if (flag == .esp) return index;
 
         return error.NoEFIPartition;
+    }
+
+    pub fn getSwapIndex(disk: DiskConfig) !usize {
+        for (disk.partitions, 1..) |partition, index|
+            if (partition.fs == .swap) return index;
+
+        return error.NoSwapPartition;
     }
 
     pub fn partDevice(disk: DiskConfig, allocator: std.mem.Allocator, idx: usize) ![]const u8 {

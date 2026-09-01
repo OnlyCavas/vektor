@@ -79,12 +79,12 @@ pub const WindowManager = struct {
         const allocator = arena.allocator();
 
         try configureDesktopPortal(runner, cfg, allocator);
-        // try configureSound(runner, cfg, allocator);
     }
 
     fn configureDesktopPortal(runner: *Runner, cfg: DesktopConfig, allocator: std.mem.Allocator) !void {
         var allocWriter: std.Io.Writer.Allocating = .init(allocator);
         defer allocWriter.deinit();
+
         const writer = &allocWriter.writer;
 
         try writer.print(
@@ -105,6 +105,4 @@ pub const WindowManager = struct {
 
         try runner.writeFile(configPath, try allocWriter.toOwnedSlice());
     }
-
-    // fn configureSound(runner: *Runner, cfg: DesktopConfig, allocator: std.mem.Allocator) !void {}
 };

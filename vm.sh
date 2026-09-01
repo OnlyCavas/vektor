@@ -26,4 +26,7 @@ qemu-system-x86_64 \
   -display gtk,gl=on \
   -cdrom "$ISO" -boot menu=on \
   -virtfs local,path="$PWD/zig-out/bin",mount_tag=host,security_model=none \
+  -audiodev pa,id=snd0 \
+  -device ich9-intel-hda \
+  -device hda-output,audiodev=snd0
   -nic user,model=virtio-net-pci

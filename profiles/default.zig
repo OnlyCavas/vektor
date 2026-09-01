@@ -51,17 +51,13 @@ pub const Config = installer{
                 .name = "cavas",
                 .shell = .zsh,
                 .groups = &.{ "wheel", "audio", "video" },
-                .dotfiles = .{
-                    .git = "https://github.com/OnlyCavas/dotfiles.git",
-                    .commit = "91de7b1fdf64b27a61acab922e8e730b864dea3d",
-                    .entryPoint = .fnl,
-                },
             },
         },
     },
     .hardware = .{ .cpu = .intel, .gpu = .virtual },
     .packages = .{
         .initSystem = .dinit,
+        .base = &.{"alacritty"},
     },
     .repositories = .{
         .enable_arch = &.{ .extra, .multilib },
@@ -71,7 +67,10 @@ pub const Config = installer{
         .firewall = .{
             .nftables = .{
                 .lanCluster = &.{
-                    .{ .label = "homelab", .maskList = &.{"10.0.1.0/24"} },
+                    .{
+                        .label = "homelab",
+                        .maskList = &.{"10.0.1.0/24"},
+                    },
                 },
                 .input = .{
                     .policy = .drop,

@@ -6,6 +6,10 @@ const utils = @import("utils");
 
 const ArtixConfiguration = @import("config").Config;
 
+// TODO I need to be sure, that every tooling effectely exists
+// NOTE Before using like [limine], check if is actually installed, if not error
+// NOTE Write tests, would be actually cool
+
 pub fn main(init: std.process.Init.Minimal) !void {
     const use_gpa = builtin.mode == .Debug;
 

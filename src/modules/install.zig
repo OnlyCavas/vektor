@@ -33,8 +33,6 @@ pub fn run(ctx: *const Ctx) !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    // TODO setup mirriors
-
     try startServices(ctx);
     try installSystem(ctx.runner, allocator, ctx.packages);
 
@@ -43,7 +41,6 @@ pub fn run(ctx: *const Ctx) !void {
     try configureSystem(ctx.runner, allocator, ctx.cfg.system);
     try configureUsers(ctx.runner, allocator, ctx.cfg.system);
 
-    // HACK only works for dinit
     try configureDisplayManager(ctx.runner);
 }
 

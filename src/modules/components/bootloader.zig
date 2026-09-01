@@ -54,7 +54,7 @@ pub const Bootloader = struct {
         try runner.exec(&.{ "mount", "--bind", "/sys", "/mnt/sys" });
         try runner.exec(&.{ "mount", "--bind", "/dev", "/mnt/dev" });
 
-        const kernelImages = try createUFIimages(runner, allocator, cfg.disk);
+        const kernelImages = try createUFIimages(runner, allocator, cfg.*);
 
         try switch (self.cfg) {
             .limine => |lc| self.setupLimine(
@@ -84,8 +84,29 @@ pub const Bootloader = struct {
             "/mnt/boot/limine/BOOTX64.EFI",
         });
 
-        const partition = try std.fmt.allocPrint(allocator, "{d}", .{try ctx.cfg.disk.getEFI()});
+        const partition = try std.fmt.allocPrint(allocator, "{d}", .{try ctx.cfg.disk.getEFIndex()});
         defer allocator.free(partition);
+
+        const nramOutput = try runner.execRead(allocator, &.{
+            "sh",
+            "-c",
+            "efibootmgr -v | grep -B1 'Pandora Box' | grep -oP '^Boot\\K[0-9A-F]{4}'",
+        });
+        defer allocator.free(nramOutput);
+
+        const nvramEntry = std.mem.trim(u8, nramOutput, " \t\r\n");
+
+        if (nvramEntry.len != 0) {
+            var entryIter = std.mem.tokenizeAny(u8, nvramEntry, " \t\r\n");
+
+            while (entryIter.next()) |entry| {
+                std.debug.print("deleting {s} entry", .{entry});
+
+                try runner.exec(&.{
+                    "efibootmgr", "-b", entry, "-B",
+                });
+            }
+        }
 
         try runner.exec(&.{
             "efibootmgr", "--create",
@@ -156,10 +177,10 @@ pub const Bootloader = struct {
         }
     }
 
-    fn createUFIimages(runner: *Runner, allocator: std.mem.Allocator, disk: DiskConfig) ![]const UnifiedKernelImage {
+    fn createUFIimages(runner: *Runner, allocator: std.mem.Allocator, cfg: InstallConfig) ![]const UnifiedKernelImage {
         try runner.exec(&.{ "mkdir", "-p", "/mnt/boot/EFI/Linux" });
 
-        const rootPartition = try disk.partDevice(allocator, try disk.getRootIndex());
+        const rootPartition = try cfg.disk.partDevice(allocator, try cfg.disk.getRootIndex());
         defer allocator.free(rootPartition);
 
         const uuid_raw = try runner.execRead(allocator, &.{ "blkid", "-s", "UUID", "-o", "value", rootPartition });
@@ -167,7 +188,7 @@ pub const Bootloader = struct {
 
         const uuid = std.mem.trim(u8, uuid_raw, " \n\r");
 
-        const cmdline = try std.fmt.allocPrint(allocator, "root=UUID={s} rw", .{uuid});
+        const cmdline = try std.fmt.allocPrint(allocator, "root=UUID={s} rw quiet splash", .{uuid});
         defer allocator.free(cmdline);
 
         try runner.writeFile("/mnt/etc/kernel/cmdline", cmdline);
@@ -189,12 +210,20 @@ pub const Bootloader = struct {
             const efiX64 = try std.fmt.allocPrint(allocator, "/boot/EFI/Linux/{s}.efi", .{kernelName});
             defer allocator.free(efiX64);
 
+            const drivers: []const []const u8 = if (cfg.hardware.gpu == .virtual)
+                &[_][]const u8{ "nvme", "ahci", "ext4", "btrfs", "virtio_blk", "virtio_pci" }
+            else
+                &[_][]const u8{ "nvme", "ahci", "ext4", "btrfs" };
+
+            const serializedDrivers = try std.mem.join(allocator, " ", drivers);
+            defer allocator.free(serializedDrivers);
+
             try runner.execChroot(&.{
                 "dracut",
                 "--force",
                 "--uefi",
                 "--add-drivers",
-                "virtio_blk virtio_pci nvme ahci ext4 btrfs",
+                serializedDrivers,
                 "--kernel-cmdline",
                 cmdline,
                 "--kver",
