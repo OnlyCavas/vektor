@@ -3,6 +3,9 @@
 zig-cache/
 zig-out/
 
+# don't count profile development
+src/core/profile.zig
+
 # local
 assets/
 

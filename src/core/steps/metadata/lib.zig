@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const NFTablesConfig = @import("config").firewall.NFTables;
+const NFTablesConfig = @import("config_types").NFTables;
 
 pub fn makeNFTConfigFile(cfg: NFTablesConfig, allocator: std.mem.Allocator) ![]const u8 {
     var allocWriter: std.Io.Writer.Allocating = .init(allocator);

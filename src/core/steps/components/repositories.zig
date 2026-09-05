@@ -1,9 +1,9 @@
 const std = @import("std");
-const config = @import("config");
+const config_types = @import("config_types");
 
-const PackageSpec = config.PackageSpec;
-const InstallConfig = config.InstallConfig;
-const RepositoryConfig = config.RepositoryConfig;
+const PackageSpec = config_types.PackageSpec;
+const InstallConfig = config_types.InstallConfig;
+const RepositoryConfig = config_types.RepositoryConfig;
 
 const Ctx = @import("../lib.zig").Context;
 
@@ -26,12 +26,12 @@ pub const Repositories = struct {
     pub fn install(self: Repositories, ctx: *const Ctx) !void {
         const runner = ctx.runner;
 
-        var arena: std.heap.ArenaAllocator = .init(ctx.runner.allocator);
+        var arena: std.heap.ArenaAllocator = .init(ctx.allocator);
         defer arena.deinit();
         const allocator = arena.allocator();
 
-        try runner.exec(&.{ "sed", "-i", "s/^#Color/Color/", "/mnt/etc/pacman.conf" });
-        try runner.exec(&.{ "sed", "-i", "/^Color/a ILoveCandy", "/mnt/etc/pacman.conf" });
+        try runner.exec(allocator, &.{ "sed", "-i", "s/^#Color/Color/", "/mnt/etc/pacman.conf" });
+        try runner.exec(allocator, &.{ "sed", "-i", "/^Color/a ILoveCandy", "/mnt/etc/pacman.conf" });
 
         if (self.cfg.enable_arch) |repos| {
             var allocWriter: std.Io.Writer.Allocating = .init(allocator);
@@ -50,7 +50,7 @@ pub const Repositories = struct {
             const append = try allocWriter.toOwnedSlice();
             defer allocator.free(append);
 
-            try runner.appendFile("/mnt/etc/pacman.conf", append);
+            try runner.appendToFile(allocator, "/mnt/etc/pacman.conf", append);
         }
     }
 };

@@ -1,8 +1,8 @@
-const config = @import("config");
+const config_types = @import("config_types");
 
-const HardwareConfig = config.HardwareConfig;
-const PackageSpec = config.PackageSpec;
-const InstallConfig = config.InstallConfig;
+const HardwareConfig = config_types.HardwareConfig;
+const PackageSpec = config_types.PackageSpec;
+const InstallConfig = config_types.InstallConfig;
 
 const Ctx = @import("../lib.zig").Context;
 

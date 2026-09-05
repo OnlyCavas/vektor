@@ -1,17 +1,15 @@
 const std = @import("std");
-const config = @import("config");
-const bootloaderConfig = @import("config").bootloader;
+const config_types = @import("config_types");
 
-const InstallConfig = config.InstallConfig;
-const DiskConfig = config.DiskConfig;
-const PackageSpec = config.PackageSpec;
+const InstallConfig = config_types.InstallConfig;
+const DiskConfig = config_types.DiskConfig;
+const PackageSpec = config_types.PackageSpec;
 
-const BootloaderConfig = bootloaderConfig.BootLoaderConfig;
-const LimineConfig = bootloaderConfig.LimineConfig;
-const LimineConfigFile = @import("metadata").LimineConfigFile;
+const BootloaderConfig = config_types.BootLoaderConfig;
+const LimineConfig = config_types.LimineConfig;
 
 const Ctx = @import("../lib.zig").Context;
-const Runner = @import("utils").Runner;
+const Runner = @import("cwd").Runner;
 
 const UnifiedKernelImage = struct {
     kernelLabel: []const u8,
@@ -46,13 +44,13 @@ pub const Bootloader = struct {
         const runner = ctx.runner;
         const cfg = ctx.cfg;
 
-        var arena: std.heap.ArenaAllocator = .init(runner.allocator);
+        var arena: std.heap.ArenaAllocator = .init(ctx.allocator);
         defer arena.deinit();
         const allocator = arena.allocator();
 
-        try runner.exec(&.{ "mount", "--bind", "/proc", "/mnt/proc" });
-        try runner.exec(&.{ "mount", "--bind", "/sys", "/mnt/sys" });
-        try runner.exec(&.{ "mount", "--bind", "/dev", "/mnt/dev" });
+        try runner.exec(allocator, &.{ "mount", "--bind", "/proc", "/mnt/proc" });
+        try runner.exec(allocator, &.{ "mount", "--bind", "/sys", "/mnt/sys" });
+        try runner.exec(allocator, &.{ "mount", "--bind", "/dev", "/mnt/dev" });
 
         const kernelImages = try createUFIimages(runner, allocator, cfg.*);
 
@@ -75,10 +73,10 @@ pub const Bootloader = struct {
     ) !void {
         const runner = ctx.runner;
 
-        try runner.exec(&.{ "mkdir", "-p", "/mnt/boot/limine" });
+        try runner.exec(allocator, &.{ "mkdir", "-p", "/mnt/boot/limine" });
         try self.writeConfigFile(runner, allocator, kernelImages);
 
-        try runner.exec(&.{
+        try runner.exec(allocator, &.{
             "cp",
             "/mnt/usr/share/limine/BOOTX64.EFI",
             "/mnt/boot/limine/BOOTX64.EFI",
@@ -102,13 +100,13 @@ pub const Bootloader = struct {
             while (entryIter.next()) |entry| {
                 std.debug.print("deleting {s} entry", .{entry});
 
-                try runner.exec(&.{
+                try runner.exec(allocator, &.{
                     "efibootmgr", "-b", entry, "-B",
                 });
             }
         }
 
-        try runner.exec(&.{
+        try runner.exec(allocator, &.{
             "efibootmgr", "--create",
             "--disk",     ctx.cfg.disk.device,
             "--part",     partition,
@@ -122,7 +120,7 @@ pub const Bootloader = struct {
             allocator,
         );
 
-        try runner.execChroot(&.{
+        try runner.execChroot(allocator, &.{
             "limine",
             "enroll-config",
             "/boot/limine/BOOTX64.EFI",
@@ -172,13 +170,13 @@ pub const Bootloader = struct {
                         .{entry.label},
                     ));
 
-                try runner.writeFile("/mnt/boot/limine/limine.conf", conf.items);
+                try runner.writeFile(allocator, "/mnt/boot/limine/limine.conf", conf.items);
             },
         }
     }
 
     fn createUFIimages(runner: *Runner, allocator: std.mem.Allocator, cfg: InstallConfig) ![]const UnifiedKernelImage {
-        try runner.exec(&.{ "mkdir", "-p", "/mnt/boot/EFI/Linux" });
+        try runner.exec(allocator, &.{ "mkdir", "-p", "/mnt/boot/EFI/Linux" });
 
         const rootPartition = try cfg.disk.partDevice(allocator, try cfg.disk.getRootIndex());
         defer allocator.free(rootPartition);
@@ -191,7 +189,7 @@ pub const Bootloader = struct {
         const cmdline = try std.fmt.allocPrint(allocator, "root=UUID={s} rw quiet splash", .{uuid});
         defer allocator.free(cmdline);
 
-        try runner.writeFile("/mnt/etc/kernel/cmdline", cmdline);
+        try runner.writeFile(allocator, "/mnt/etc/kernel/cmdline", cmdline);
 
         const listKernels = try runner.execRead(allocator, &.{ "ls", "/mnt/lib/modules" });
         defer allocator.free(listKernels);
@@ -218,7 +216,7 @@ pub const Bootloader = struct {
             const serializedDrivers = try std.mem.join(allocator, " ", drivers);
             defer allocator.free(serializedDrivers);
 
-            try runner.execChroot(&.{
+            try runner.execChroot(allocator, &.{
                 "dracut",
                 "--force",
                 "--uefi",

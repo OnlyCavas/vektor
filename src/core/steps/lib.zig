@@ -1,14 +1,30 @@
 const std = @import("std");
-const config = @import("config");
+const config_types = @import("config_types");
 
 const meta = @import("std").meta;
 
-const Runner = @import("utils").Runner;
+const Runner = @import("cwd").Runner;
 
-const InstallConfig = config.InstallConfig;
-const InitSystem = config.InitSystem;
-const PackageSpec = config.PackageSpec;
-const ServiceSpec = config.ServiceSpec;
+const InstallConfig = config_types.InstallConfig;
+const InitSystem = config_types.InitSystem;
+const PackageSpec = config_types.PackageSpec;
+const ServiceSpec = config_types.ServiceSpec;
+
+const Allocator = std.mem.Allocator;
+
+const disk = @import("disk-partition.zig");
+const install = @import("system-install.zig");
+const extra = @import("extra-config.zig");
+
+const modules = .{
+    disk,
+    install,
+    extra,
+};
+
+comptime {
+    for (modules) |m| Module.verify(m);
+}
 
 pub const Services = struct {
     runner: *Runner,
@@ -34,10 +50,10 @@ pub const Services = struct {
                 const owner = try std.fmt.allocPrint(allocator, "{s}:{s}", .{ username, username });
                 defer allocator.free(owner);
 
-                try self.runner.execChroot(&.{ "mkdir", "-p", bootd });
+                try self.runner.execChroot(allocator, &.{ "mkdir", "-p", bootd });
             },
             .runit => {
-                try self.runner.execChroot(&.{ "mkdir", "-p", baseDir });
+                try self.runner.execChroot(allocator, &.{ "mkdir", "-p", baseDir });
             },
             else => {},
         }
@@ -52,33 +68,34 @@ pub const Services = struct {
                 const owner = try std.fmt.allocPrint(allocator, "{s}:{s}", .{ username, username });
                 defer allocator.free(owner);
 
-                try self.runner.execChroot(&.{ "chown", "-R", owner, homeDir });
+                try self.runner.execChroot(allocator, &.{ "chown", "-R", owner, homeDir });
             },
             else => {},
         };
     }
 
-    pub fn enableService(self: Services, service: ServiceSpec, user: []const u8) !void {
-        var arena: std.heap.ArenaAllocator = .init(self.runner.allocator);
+    pub fn enableService(self: Services, allocator: Allocator, service: ServiceSpec, user: []const u8) !void {
+        var arena: std.heap.ArenaAllocator = .init(allocator);
         defer arena.deinit();
-        const allocator = arena.allocator();
+
+        const arean_alloc = arena.allocator();
         const serviceName = service.service();
 
         switch (self.init) {
             .runit => {
                 const runitBaseDir = "/etc/runit/sv";
-                const target = try std.fmt.allocPrint(allocator, "{s}/{s}", .{
+                const target = try std.fmt.allocPrint(arean_alloc, "{s}/{s}", .{
                     runitBaseDir,
                     serviceName,
                 });
 
                 switch (service.scope) {
                     .boot => {
-                        try self.runner.execChroot(&.{ "ln", "-sf", target, "/etc/runit/runsvdir/default/" });
+                        try self.runner.execChroot(arean_alloc, &.{ "ln", "-sf", target, "/etc/runit/runsvdir/default/" });
                     },
                     .user => {
-                        const baseDir = (try self.initUserDir(allocator, user)) orelse return;
-                        try self.runner.execChroot(&.{ "ln", "-sf", target, baseDir });
+                        const baseDir = (try self.initUserDir(arean_alloc, user)) orelse return;
+                        try self.runner.execChroot(arean_alloc, &.{ "ln", "-sf", target, baseDir });
                     },
                 }
             },
@@ -87,32 +104,32 @@ pub const Services = struct {
 
                 switch (service.scope) {
                     .boot => {
-                        const target = try std.fmt.allocPrint(allocator, "{s}/{s}", .{
+                        const target = try std.fmt.allocPrint(arean_alloc, "{s}/{s}", .{
                             dinitBase,
                             serviceName,
                         });
 
-                        const link = try std.fmt.allocPrint(allocator, "{s}/boot.d", .{
+                        const link = try std.fmt.allocPrint(arean_alloc, "{s}/boot.d", .{
                             dinitBase,
                         });
 
-                        try self.runner.execChroot(&.{ "ln", "-sf", target, link });
+                        try self.runner.execChroot(arean_alloc, &.{ "ln", "-sf", target, link });
                     },
                     .user => {
-                        const target = try std.fmt.allocPrint(allocator, "{s}/user/{s}", .{
+                        const target = try std.fmt.allocPrint(arean_alloc, "{s}/user/{s}", .{
                             dinitBase,
                             serviceName,
                         });
 
-                        const baseDir = (try self.initUserDir(allocator, user)) orelse return;
+                        const baseDir = (try self.initUserDir(arean_alloc, user)) orelse return;
 
                         const userBaseDir = try std.fmt.allocPrint(
-                            allocator,
+                            arean_alloc,
                             "{s}/boot.d",
                             .{baseDir},
                         );
 
-                        try self.runner.execChroot(&.{ "ln", "-sf", target, userBaseDir });
+                        try self.runner.execChroot(arean_alloc, &.{ "ln", "-sf", target, userBaseDir });
                     },
                 }
             },
@@ -120,17 +137,18 @@ pub const Services = struct {
         }
     }
 
-    pub fn start(self: Services, service: []const u8) !void {
+    pub fn start(self: Services, allocator: Allocator, service: []const u8) !void {
         switch (self.init) {
-            .openrc => try self.runner.exec(&.{ "rc-service", service, "start" }),
-            .runit => try self.runner.exec(&.{ "sv", "up", service }),
-            .dinit => try self.runner.exec(&.{ "dinitctl", "start", service }),
-            .s6 => try self.runner.exec(&.{ "s6-rc", "-u", "change", service }),
+            .openrc => try self.runner.exec(allocator, &.{ "rc-service", service, "start" }),
+            .runit => try self.runner.exec(allocator, &.{ "sv", "up", service }),
+            .dinit => try self.runner.exec(allocator, &.{ "dinitctl", "start", service }),
+            .s6 => try self.runner.exec(allocator, &.{ "s6-rc", "-u", "change", service }),
         }
     }
 };
 
 pub const Context = struct {
+    allocator: Allocator,
     runner: *Runner,
     cfg: *const InstallConfig,
     packages: []const []const u8,
@@ -192,21 +210,7 @@ fn installComponents(comptime M: type, ctx: *const Context) !void {
         try component.fromConfig(ctx.cfg).install(ctx);
 }
 
-const disk = @import("disk.zig");
-const install = @import("install.zig");
-const extra = @import("extra.zig");
-
-const modules = .{
-    disk,
-    install,
-    extra,
-};
-
-comptime {
-    for (modules) |m| Module.verify(m);
-}
-
-pub fn runAll(runner: *Runner, comptime cfg: InstallConfig) !void {
+pub fn runAll(allocator: Allocator, runner: *Runner, comptime cfg: InstallConfig) !void {
     const shellSpec = comptime blk: {
         var base: []const []const u8 = &.{};
 
@@ -227,6 +231,7 @@ pub fn runAll(runner: *Runner, comptime cfg: InstallConfig) !void {
     const installPackages = comptime specs.packageList();
 
     var ctx: Context = .{
+        .allocator = allocator,
         .runner = runner,
         .cfg = &cfg,
         .packages = installPackages,
@@ -244,16 +249,16 @@ pub fn runAll(runner: *Runner, comptime cfg: InstallConfig) !void {
     const primary = try cfg.system.primaryUser();
     try enableServices(&ctx, specs, primary.name);
 
-    try runner.exec(&.{"sync"});
-    try runner.exec(&.{ "umount", "-R", "/mnt" });
-    try runner.exec(&.{"reboot"});
+    try runner.exec(allocator, &.{"sync"});
+    try runner.exec(allocator, &.{ "umount", "-R", "/mnt" });
+    try runner.exec(allocator, &.{"reboot"});
 }
 
 fn enableServices(ctx: *const Context, specs: PackageSpec, username: []const u8) !void {
-    try ctx.services().ensureInitConfig(ctx.runner.allocator, username);
+    try ctx.services().ensureInitConfig(ctx.allocator, username);
 
     for (specs.services) |service|
-        try ctx.services().enableService(service, username);
+        try ctx.services().enableService(ctx.allocator, service, username);
 
-    try ctx.services().chownInitConfig(ctx.runner.allocator, username);
+    try ctx.services().chownInitConfig(ctx.allocator, username);
 }

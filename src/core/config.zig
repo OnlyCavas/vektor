@@ -1,7 +1,127 @@
 const std = @import("std");
 
-pub const firewall = @import("firewall.zig");
-pub const bootloader = @import("bootloader.zig");
+const LanCluster = struct {
+    label: []const u8,
+    maskList: []const []const u8,
+};
+
+const Policy = enum {
+    accept,
+    drop,
+    reject,
+
+    pub fn getName(self: Policy) []const u8 {
+        return @tagName(self);
+    }
+};
+
+const Protocol = enum {
+    tcp,
+    udp,
+
+    pub fn getName(self: Protocol) []const u8 {
+        return @tagName(self);
+    }
+};
+
+const Rules = struct {
+    clusterLabel: ?[]const u8 = null,
+    protocol: ?enum { tcp, udp } = null,
+    dport: ?[]const u8 = null,
+    sport: ?[]const u8 = null,
+    extend: ?[]const u8 = null,
+    policy: Policy = .drop,
+};
+
+const Chain = struct {
+    rules: []const Rules = &.{},
+    policy: Policy,
+};
+
+pub const NFTables = struct {
+    lanCluster: []const LanCluster = &.{},
+
+    input: Chain = .{ .policy = .drop },
+    forward: Chain = .{ .policy = .drop },
+    output: Chain = .{ .policy = .drop },
+};
+
+pub const Firewall = union(enum) {
+    none: void,
+    nftables: NFTables,
+
+    pub const disabled: Firewall = .{ .none = {} };
+
+    pub const default: Firewall = .{
+        .nftables = .{
+            .lanCluster = &.{
+                .{ .label = "homelab", .maskList = &.{"10.0.1.0/24"} },
+            },
+            .input = .{
+                .policy = .drop,
+                .rules = &.{
+                    .{
+                        .clusterLabel = "homelab",
+                        .extend = "icmp type echo-request",
+                        .policy = .accept,
+                    },
+                    .{
+                        .clusterLabel = "homelab",
+                        .protocol = .tcp,
+                        .dport = "22",
+                        .extend = "ct state new limit rate 5/minute",
+                        .policy = .accept,
+                    },
+                },
+            },
+        },
+    };
+};
+
+pub const KernelEntry = struct {
+    label: []const u8,
+    package: enum {
+        standard,
+        lts,
+        hardened,
+
+        pub fn name(self: @This()) []const u8 {
+            return switch (self) {
+                .standard => "linux",
+                .lts => "linux-lts",
+                .hardened => "linux-hardened",
+            };
+        }
+
+        pub fn packages(self: @This()) []const []const u8 {
+            return switch (self) {
+                .standard => &.{ "linux", "linux-headers" },
+                .lts => &.{ "linux-lts", "linux-lts-headers" },
+                .hardened => &.{ "linux-hardened", "linux-hardened-headers" },
+            };
+        }
+    },
+};
+
+pub const LimineConfig = struct {
+    timeout: u32 = 5,
+    withWindows: ?struct { label: []const u8 } = null,
+    bootEntryName: []const u8 = "Artix Limine",
+    entries: []const KernelEntry = &.{
+        .{
+            .label = "Artix Linux",
+            .package = .standard,
+        },
+    },
+
+    pub const default: LimineConfig = .{};
+};
+
+pub const BootLoaderConfig = union(enum) {
+    limine: LimineConfig,
+
+    pub const default: BootLoaderConfig = .{ .limine = .default };
+};
 
 pub const HardwareConfig = struct {
     cpu: enum {
@@ -32,8 +152,8 @@ pub const PrivilegeEscalationConfig = enum {
 
 const SecurityConfig = struct {
     priviledgeEscalation: PrivilegeEscalationConfig = .sudo,
-    firewall: firewall.Firewall = .default,
-    bootloader: bootloader.BootLoaderConfig = .default,
+    firewall: Firewall = .default,
+    bootloader: BootLoaderConfig = .default,
 };
 
 pub const Shell = enum {

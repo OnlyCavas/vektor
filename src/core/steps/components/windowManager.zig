@@ -1,13 +1,13 @@
 const std = @import("std");
-const config = @import("config");
+const config_types = @import("config_types");
 
-const PackageSpec = config.PackageSpec;
-const ServiceSpec = config.ServiceSpec;
-const InstallConfig = config.InstallConfig;
-const DesktopConfig = config.DesktopConfig;
+const PackageSpec = config_types.PackageSpec;
+const ServiceSpec = config_types.ServiceSpec;
+const InstallConfig = config_types.InstallConfig;
+const DesktopConfig = config_types.DesktopConfig;
 
+const Runner = @import("cwd").Runner;
 const Ctx = @import("../lib.zig").Context;
-const Runner = @import("utils").Runner;
 
 pub const WindowManager = struct {
     cfg: DesktopConfig,
@@ -74,7 +74,7 @@ pub const WindowManager = struct {
         const runner = ctx.runner;
         const cfg = self.cfg;
 
-        var arena: std.heap.ArenaAllocator = .init(ctx.runner.allocator);
+        var arena: std.heap.ArenaAllocator = .init(ctx.allocator);
         defer arena.deinit();
         const allocator = arena.allocator();
 
@@ -103,6 +103,6 @@ pub const WindowManager = struct {
 
         defer allocator.free(configPath);
 
-        try runner.writeFile(configPath, try allocWriter.toOwnedSlice());
+        try runner.writeFile(allocator, configPath, try allocWriter.toOwnedSlice());
     }
 };

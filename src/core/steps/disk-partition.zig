@@ -1,13 +1,15 @@
 const std = @import("std");
-const config = @import("config");
+const config_types = @import("config_types");
+
+const DiskConfig = config_types.DiskConfig;
 
 const Ctx = @import("lib.zig").Context;
-const Runner = @import("utils").Runner;
+const Runner = @import("cwd").Runner;
 
 pub const label = "Partition the disks";
 
 pub fn run(ctx: *const Ctx) !void {
-    var arena: std.heap.ArenaAllocator = .init(ctx.runner.allocator);
+    var arena: std.heap.ArenaAllocator = .init(ctx.allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
@@ -16,7 +18,7 @@ pub fn run(ctx: *const Ctx) !void {
     try mount(ctx.runner, allocator, ctx.cfg.disk);
 }
 
-fn partition(ctx: *Runner, allocator: std.mem.Allocator, disk: config.DiskConfig) !void {
+fn partition(ctx: *Runner, allocator: std.mem.Allocator, disk: DiskConfig) !void {
     var script: std.ArrayList(u8) = .empty;
     defer script.deinit(allocator);
 
@@ -42,37 +44,37 @@ fn partition(ctx: *Runner, allocator: std.mem.Allocator, disk: config.DiskConfig
         try script.appendSlice(allocator, try std.fmt.allocPrint(allocator, ",{s},{s}\n", .{ size, sfdiskType }));
     }
 
-    try ctx.execInput(&.{ "sfdisk", "--wipe", "always", disk.device }, script.items);
+    try ctx.execInput(allocator, &.{ "sfdisk", "--wipe", "always", disk.device }, script.items);
 }
 
-fn partIndex(disk: config.DiskConfig, plabel: []const u8) ?usize {
+fn partIndex(disk: DiskConfig, plabel: []const u8) ?usize {
     for (disk.partitions, 1..) |part, idx|
         if (std.mem.eql(u8, part.label, plabel)) return idx;
 
     return null;
 }
 
-fn format(ctx: *Runner, allocator: std.mem.Allocator, disk: config.DiskConfig) !void {
+fn format(ctx: *Runner, allocator: std.mem.Allocator, disk: DiskConfig) !void {
     for (disk.partitions, 1..) |part, index| {
         const device = try disk.partDevice(allocator, index);
 
         switch (part.fs) {
-            .ext4 => try ctx.exec(&.{ "mkfs.ext4", "-F", device }),
-            .fat32 => try ctx.exec(&.{ "mkfs.fat", "-F32", device }),
+            .ext4 => try ctx.exec(allocator, &.{ "mkfs.ext4", "-F", device }),
+            .fat32 => try ctx.exec(allocator, &.{ "mkfs.fat", "-F32", device }),
             .swap => {
-                try ctx.exec(&.{ "mkswap", device });
-                try ctx.exec(&.{ "swapon", device });
+                try ctx.exec(allocator, &.{ "mkswap", device });
+                try ctx.exec(allocator, &.{ "swapon", device });
             },
         }
     }
 }
 
-fn mount(ctx: *Runner, allocator: std.mem.Allocator, disk: config.DiskConfig) !void {
+fn mount(ctx: *Runner, allocator: std.mem.Allocator, disk: DiskConfig) !void {
     for (disk.mounts) |m| {
         const index = partIndex(disk, m.partition) orelse return error.UnknownPartition;
         const device = try disk.partDevice(allocator, index);
         const target = try std.fmt.allocPrint(allocator, "/mnt{s}", .{m.target});
 
-        try ctx.exec(&.{ "mount", "--mkdir", device, target });
+        try ctx.exec(allocator, &.{ "mount", "--mkdir", device, target });
     }
 }
