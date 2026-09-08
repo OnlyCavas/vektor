@@ -12,13 +12,13 @@ const ServiceSpec = config_types.ServiceSpec;
 
 const Allocator = std.mem.Allocator;
 
-const disk = @import("disk-partition.zig");
-const install = @import("system-install.zig");
-const extra = @import("extra-config.zig");
+const disk = @import("steps/disk-partition.zig");
+const system_install = @import("steps/system-install.zig");
+const extra = @import("steps/extra-config.zig");
 
 const modules = .{
     disk,
-    install,
+    system_install,
     extra,
 };
 
@@ -210,7 +210,16 @@ fn installComponents(comptime M: type, ctx: *const Context) !void {
         try component.fromConfig(ctx.cfg).install(ctx);
 }
 
-pub fn runAll(allocator: Allocator, runner: *Runner, comptime cfg: InstallConfig) !void {
+fn enableServices(ctx: *const Context, specs: PackageSpec, username: []const u8) !void {
+    try ctx.services().ensureInitConfig(ctx.allocator, username);
+
+    for (specs.services) |service|
+        try ctx.services().enableService(ctx.allocator, service, username);
+
+    try ctx.services().chownInitConfig(ctx.allocator, username);
+}
+
+pub fn install(allocator: Allocator, runner: *Runner, comptime cfg: InstallConfig) !void {
     const shellSpec = comptime blk: {
         var base: []const []const u8 = &.{};
 
@@ -252,13 +261,4 @@ pub fn runAll(allocator: Allocator, runner: *Runner, comptime cfg: InstallConfig
     try runner.exec(allocator, &.{"sync"});
     try runner.exec(allocator, &.{ "umount", "-R", "/mnt" });
     try runner.exec(allocator, &.{"reboot"});
-}
-
-fn enableServices(ctx: *const Context, specs: PackageSpec, username: []const u8) !void {
-    try ctx.services().ensureInitConfig(ctx.allocator, username);
-
-    for (specs.services) |service|
-        try ctx.services().enableService(ctx.allocator, service, username);
-
-    try ctx.services().chownInitConfig(ctx.allocator, username);
 }

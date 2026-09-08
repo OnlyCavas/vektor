@@ -1,7 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
-
-const steps = @import("steps/lib.zig");
+const steps = @import("steps.zig");
 
 const InstallConfig = @import("config").Config;
 const Runner = @import("cwd").Runner;
@@ -47,7 +46,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     });
     defer runner.deinit();
 
-    steps.runAll(allocator, &runner, InstallConfig) catch |e| {
+    steps.install(allocator, &runner, InstallConfig) catch |e| {
         var buf: [1024]u8 = undefined;
         runner.logger.err(&buf, "installation failed: {s}\n", .{@errorName(e)}) catch {};
 
