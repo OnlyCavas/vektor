@@ -5,7 +5,7 @@ const PackageSpec = config_types.PackageSpec;
 const SystemConfig = config_types.SystemConfig;
 
 const Allocator = std.mem.Allocator;
-const Ctx = @import("lib.zig").Context;
+const Ctx = @import("context.zig").Context;
 const Runner = @import("cwd").Runner;
 
 const Bootloader = @import("components/bootloader.zig").Bootloader;

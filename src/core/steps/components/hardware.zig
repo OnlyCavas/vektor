@@ -4,7 +4,7 @@ const HardwareConfig = config_types.HardwareConfig;
 const PackageSpec = config_types.PackageSpec;
 const InstallConfig = config_types.InstallConfig;
 
-const Ctx = @import("../lib.zig").Context;
+const Ctx = @import("../context.zig").Context;
 
 pub const Hardware = struct {
     cfg: HardwareConfig,

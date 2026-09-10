@@ -8,7 +8,7 @@ const PackageSpec = config_types.PackageSpec;
 const BootloaderConfig = config_types.BootLoaderConfig;
 const LimineConfig = config_types.LimineConfig;
 
-const Ctx = @import("../lib.zig").Context;
+const Ctx = @import("../context.zig").Context;
 const Runner = @import("cwd").Runner;
 
 const UnifiedKernelImage = struct {

@@ -7,7 +7,7 @@ const InstallConfig = config_types.InstallConfig;
 const DesktopConfig = config_types.DesktopConfig;
 
 const Runner = @import("cwd").Runner;
-const Ctx = @import("../lib.zig").Context;
+const Ctx = @import("../context.zig").Context;
 
 pub const WindowManager = struct {
     cfg: DesktopConfig,

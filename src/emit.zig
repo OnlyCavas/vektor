@@ -1,5 +1,5 @@
 const std = @import("std");
-const codegen = @import("codegen.zig");
+const codegen = @import("ziggen.zig");
 
 const Allocator = std.mem.Allocator;
 const Writer = std.Io.Writer;

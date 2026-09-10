@@ -7,7 +7,7 @@ const PackageSpec = config_types.PackageSpec;
 const InstallConfig = config_types.InstallConfig;
 const FirewallConfig = config_types.Firewall;
 
-const Ctx = @import("../lib.zig").Context;
+const Ctx = @import("../context.zig").Context;
 
 pub const Firewall = struct {
     cfg: FirewallConfig,

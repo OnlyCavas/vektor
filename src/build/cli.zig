@@ -23,10 +23,11 @@ const CliWalker = struct {
 
         fn parse(allocator: Allocator, payload: []const u8, path: []const u8) !Command {
             const zigIdx = std.mem.indexOf(u8, path, ".zig") orelse return CommandError.FailToParse;
+            const slashIdx = std.mem.lastIndexOf(u8, path, "/") orelse return CommandError.FailToParse;
             const docTags: DocTags = try .extract(allocator, payload);
 
             return .{
-                .name = path[0..zigIdx],
+                .name = path[slashIdx + 1 .. zigIdx],
                 .description = docTags.find("vektor") orelse return CommandError.FailToParse,
                 .path = path,
                 .docTags = docTags,
@@ -45,8 +46,6 @@ const CliWalker = struct {
 
     fn walkDir(
         self: *CliWalker,
-        b: *std.Build,
-        wfs: *std.Build.Step.WriteFile,
         core_dir: []const u8,
     ) !void {
         const allocator = self.arena.allocator();
@@ -65,11 +64,9 @@ const CliWalker = struct {
             if (item.kind != .file) continue;
             if (!std.mem.endsWith(u8, item.path, ".zig")) continue;
 
-            const src_path = try std.fs.path.join(allocator, &.{ core_dir, item.path });
-            _ = wfs.addCopyFile(b.path(src_path), item.path);
-
-            const raw = try core.readFileAlloc(io, item.path, allocator, .unlimited);
-            const cmd = try parse(allocator, item.path, raw) orelse continue;
+            const source_path = try std.fs.path.join(allocator, &.{ core_dir, item.path });
+            const payload = try core.readFileAlloc(io, item.path, allocator, .unlimited);
+            const cmd = try parse(allocator, source_path, payload) orelse continue;
 
             try self.cmds.append(allocator, cmd);
         }
@@ -258,7 +255,7 @@ fn genActions(allocator: Allocator, cmds: []const CliWalker.Command) ![]const u8
     );
 
     for (cmds) |cmd| {
-        try wAlloc.writer.print("const {s} = @import(\"{s}\");\n", .{ cmd.name, cmd.path });
+        try wAlloc.writer.print("const {s} = @import(\"{s}\");\n", .{ cmd.name, cmd.name });
     }
 
     try wAlloc.writer.writeAll(
@@ -300,7 +297,7 @@ fn genActions(allocator: Allocator, cmds: []const CliWalker.Command) ![]const u8
     return wAlloc.toOwnedSlice();
 }
 
-pub fn init(b: *std.Build) !Cli {
+pub fn init(b: *std.Build, vektor: *std.Build.Module) !Cli {
     const core_dir: []const u8 = "./src/cli";
 
     var arena_alloc: std.heap.ArenaAllocator = .init(b.allocator);
@@ -312,7 +309,7 @@ pub fn init(b: *std.Build) !Cli {
     var walker: CliWalker = .init(allocator);
     defer walker.deinit(allocator);
 
-    try walker.walkDir(b, wfs, core_dir);
+    try walker.walkDir(core_dir);
 
     const action_payload = try genActions(allocator, walker.cmds.items);
     const cli_lib_file = wfs.add("cli.zig", action_payload);
@@ -320,9 +317,21 @@ pub fn init(b: *std.Build) !Cli {
     const cli_strings_payload = try genCliStrings(allocator, walker.cmds.items);
     const cli_strings_file = wfs.add("cli_string.zig", cli_strings_payload);
 
+    _ = wfs.addCopyFile(b.path("src/cli/args.zig"), "args.zig");
+
     const cli_module = b.createModule(.{
         .root_source_file = cli_lib_file,
     });
+
+    for (walker.cmds.items) |cmd| {
+        const cmd_module = b.createModule(.{
+            .root_source_file = b.path(cmd.path),
+        });
+
+        cmd_module.addImport("vektor", vektor);
+        cli_module.addImport(cmd.name, cmd_module);
+        cmd_module.addImport("cli", cli_module);
+    }
 
     cli_module.addAnonymousImport("cli_strings", .{
         .root_source_file = cli_strings_file,

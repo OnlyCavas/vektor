@@ -1,9 +1,10 @@
 const std = @import("std");
+const context = @import("context.zig");
 const config_types = @import("config_types");
 
 const DiskConfig = config_types.DiskConfig;
 
-const Ctx = @import("lib.zig").Context;
+const Ctx = context.Context;
 const Runner = @import("cwd").Runner;
 
 pub const label = "Partition the disks";

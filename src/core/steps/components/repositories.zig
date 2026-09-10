@@ -5,7 +5,7 @@ const PackageSpec = config_types.PackageSpec;
 const InstallConfig = config_types.InstallConfig;
 const RepositoryConfig = config_types.RepositoryConfig;
 
-const Ctx = @import("../lib.zig").Context;
+const Ctx = @import("../context.zig").Context;
 
 pub const Repositories = struct {
     cfg: RepositoryConfig,

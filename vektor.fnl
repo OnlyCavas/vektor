@@ -1,3 +1,5 @@
+; example configuration [fnl]
+
 ;imports
 ; NOTE dotfiles lib import [module] for now
 

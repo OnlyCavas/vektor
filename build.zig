@@ -6,16 +6,23 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const root_mod = b.addModule("vektor", .{
+        .root_source_file = b.path("src/root.zig"),
+    });
+
     const exe = b.addExecutable(.{
         .name = "vektor",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
+            .imports = &.{
+                .{ .name = "vektor", .module = root_mod },
+            },
         }),
     });
 
-    const cli = try buildpkg.Cli.init(b);
+    const cli = try buildpkg.Cli.init(b, root_mod);
     try cli.addImport(exe);
 
     const embedded_core = try buildpkg.EmbeddedCore.init(b);

@@ -8,7 +8,7 @@ const PrivelidgeEscalationConfig = config_types.PrivilegeEscalationConfig;
 const InstallConfig = config_types.InstallConfig;
 
 const Runner = @import("cwd").Runner;
-const Ctx = @import("../lib.zig").Context;
+const Ctx = @import("../context.zig").Context;
 
 const doas_conf = "permit persist setenv { PATH=/usr/local/bin:/usr/local/sbin:/usr/sbin } :wheel\n";
 const sudoers_wheel = "%wheel ALL=(ALL:ALL) ALL\n";

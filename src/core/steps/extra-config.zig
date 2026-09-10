@@ -7,7 +7,7 @@ const PackageSpec = config_types.PackageSpec;
 const Repositories = @import("components/repositories.zig").Repositories;
 const WindowManager = @import("components/windowManager.zig").WindowManager;
 
-const Ctx = @import("lib.zig").Context;
+const Ctx = @import("context.zig").Context;
 const Runner = @import("cwd").Runner;
 
 pub const label = "Extra - System Configuration";
