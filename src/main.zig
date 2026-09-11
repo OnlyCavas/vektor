@@ -1,8 +1,10 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const vektor = @import("vektor");
 const cli = @import("cli");
 
 const Parser = cli.Parser;
+const Action = cli.Action;
 
 pub fn main(init: std.process.Init.Minimal) !void {
     const use_gpa = builtin.mode == .Debug;
@@ -13,10 +15,18 @@ pub fn main(init: std.process.Init.Minimal) !void {
     };
     const allocator = if (use_gpa) gpa.allocator() else std.heap.smp_allocator;
 
-    var parser: Parser = .init(init.args);
-    const action = try parser.parse() orelse return error.NoAction;
+    var threaded: std.Io.Threaded = .init(allocator, .{});
+    defer threaded.deinit();
 
-    std.process.exit(action.run(allocator, &parser) catch |err| err: {
+    vektor.init(.{
+        .gpa_allocator = allocator,
+        .io = threaded.io(),
+    });
+
+    var parser: Parser = .init(init.args);
+    const action = try parser.parse() orelse Action.help;
+
+    std.process.exit(action.run(allocator, vektor.io(), &parser) catch |err| err: {
         std.log.err("failed with {}", .{err});
         break :err 1;
     });

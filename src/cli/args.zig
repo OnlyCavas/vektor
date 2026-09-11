@@ -46,7 +46,8 @@ pub const Parser = struct {
 
     pub fn parse(self: *Parser) !?Action {
         while (self.next()) |arg| {
-            // NOTE specialcases: help
+            if (Action.detectHelp(arg)) |action|
+                return action;
 
             if (std.mem.startsWith(u8, arg, "-"))
                 continue;
@@ -73,7 +74,7 @@ pub const Parser = struct {
 
         while (self.next()) |arg| {
             if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
-                return Action.help;
+                return Action.help_error;
             }
 
             var key: []const u8 = key: {
@@ -118,9 +119,6 @@ pub const Parser = struct {
 
         inline for (info.@"struct".fields) |field| {
             if (field.name[0] != '_' and std.mem.eql(u8, field.name, key)) {
-                std.debug.print("Key = {s} >> ", .{key});
-                std.debug.print("Value = {?s}\n", .{value});
-
                 const Field = switch (@typeInfo(field.type)) {
                     .optional => |opt| opt.child,
                     else => field.type,

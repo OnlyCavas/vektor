@@ -11,12 +11,12 @@ const Parser = cli.Parser;
 
 const log = std.log.scoped(.gen);
 
+/// @flags
 pub const Options = struct {
     _arena: ?ArenaAllocator = null,
 
-    /// Where to write generated files.
-    /// @default ./src/generated
-    /// @short
+    /// @description Where to write generated files.
+    /// @short o
     output: f16 = 0,
 
     fn deinit(self: *Options) void {
@@ -34,6 +34,7 @@ pub fn run(allocator: Allocator, parser: *Parser) !u8 {
     var cfg: Options = .{};
     defer cfg.deinit();
 
+    // TODO pass on the ctx
     var threaded: std.Io.Threaded = .init(allocator, .{});
     defer threaded.deinit();
     const io = threaded.io();
