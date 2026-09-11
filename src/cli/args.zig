@@ -6,6 +6,7 @@ const cli = @import("cli.zig");
 pub const ArgsIterator = std.process.Args.Iterator;
 
 const Action = cli.Action;
+const Option = cli.Option;
 const Allocator = std.mem.Allocator;
 
 pub const Parser = struct {
@@ -115,10 +116,45 @@ pub const Parser = struct {
         key: []const u8,
         value: ?[]const u8,
     ) !void {
-        const info = @typeInfo(T);
+        const all_fields = @typeInfo(T).@"struct".fields;
 
-        inline for (info.@"struct".fields) |field| {
-            if (field.name[0] != '_' and std.mem.eql(u8, field.name, key)) {
+        const usable_fields = comptime blk: {
+            var arr: [all_fields.len]std.builtin.Type.StructField = undefined;
+            var n: usize = 0;
+
+            for (all_fields) |field| {
+                if (field.name[0] == '_') continue;
+                arr[n] = field;
+                n += 1;
+            }
+
+            break :blk arr[0..n].*;
+        };
+
+        const FieldMap = comptime std.StaticStringMap(usize).initComptime(blk: {
+            var kvs: [usable_fields.len]struct { []const u8, usize } = undefined;
+            for (usable_fields, 0..) |field, i| kvs[i] = .{ field.name, i };
+            break :blk kvs;
+        });
+
+        const options: []const Option = if (cli.action()) |action| action.options() else return;
+
+        const canonical: []const u8 = blk: {
+            for (options) |opt| {
+                const short = opt.short orelse continue;
+
+                if (std.mem.eql(u8, short, key)) break :blk opt.name;
+            }
+
+            break :blk key;
+        };
+
+        const idx = FieldMap.get(canonical) orelse return;
+
+        switch (idx) {
+            inline 0...usable_fields.len - 1 => |i| {
+                const field = usable_fields[i];
+
                 const Field = switch (@typeInfo(field.type)) {
                     .optional => |opt| opt.child,
                     else => field.type,
@@ -131,7 +167,8 @@ pub const Parser = struct {
                     inline f16, f32, f64, f128, f80 => |Float| try parseFloat(Float, value),
                     else => @compileError("unsupported field type: " ++ @typeName(Field)),
                 };
-            }
+            },
+            else => unreachable,
         }
     }
 

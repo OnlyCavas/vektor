@@ -19,7 +19,6 @@ pub fn main(init: std.process.Init.Minimal) !void {
     defer threaded.deinit();
 
     vektor.init(.{
-        .gpa_allocator = allocator,
         .io = threaded.io(),
     });
 

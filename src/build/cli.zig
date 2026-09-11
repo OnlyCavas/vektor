@@ -263,7 +263,10 @@ fn genActions(allocator: Allocator, cmds: []const CliWalker.Command) ![]const u8
     defer wAlloc.deinit();
 
     try wAlloc.writer.writeAll(
+        \\const Self = @This();
+        \\
         \\const std = @import("std");
+        \\const vektor = @import("vektor");
         \\const Allocator = std.mem.Allocator;
         \\
         \\const args = @import("args.zig");
@@ -284,6 +287,12 @@ fn genActions(allocator: Allocator, cmds: []const CliWalker.Command) ![]const u8
         \\    description: ?[]const u8 = null,
         \\};
         \\
+        \\var _action: ?Action = null;
+        \\
+        \\pub fn action() ?Action {
+        \\  return Self._action;
+        \\}
+        \\
         \\pub const Action = enum {
         \\
     );
@@ -303,6 +312,8 @@ fn genActions(allocator: Allocator, cmds: []const CliWalker.Command) ![]const u8
         \\    }
         \\
         \\    pub fn run(self: Action, allocator: Allocator, io: std.Io, parser: *Parser) !u8 {
+        \\        Self._action = self;
+        \\
         \\        return self.runCmd(allocator, parser) catch |err| switch (err) {
         \\            help_error => err: {
         \\                inline for (@typeInfo(Action).@"enum".fields) |cmd| {
@@ -321,15 +332,20 @@ fn genActions(allocator: Allocator, cmds: []const CliWalker.Command) ![]const u8
         \\                            \\USAGE:
         \\                            \\  vektor {s} [OPTIONS]
         \\                            \\
-        \\                            \\
         \\                        , .{cmd.name});
         \\
-        \\                        try stdout.writeAll(
-        \\                            \\OPTIONS:
-        \\                            \\
-        \\                        );
         \\
-        \\                        for (self.options()) |opt| {
+        \\                        const opts = self.options();
+        \\
+        \\                        if (opts.len != 0) {
+        \\                            try stdout.writeAll(
+        \\                              \\
+        \\                              \\OPTIONS:
+        \\                              \\
+        \\                            );
+        \\                        }
+        \\
+        \\                        for (opts) |opt| {
         \\                            try stdout.writeAll("   ");
         \\
         \\                            if (opt.short) |short|
