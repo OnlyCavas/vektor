@@ -6,6 +6,8 @@ const ziggen = @import("vektor").ziggen;
 
 const ZigValue = ziggen.ZigValue;
 const ArenaAllocator = std.heap.ArenaAllocator;
+
+const Ctx = cli.Ctx;
 const Allocator = std.mem.Allocator;
 const Parser = cli.Parser;
 
@@ -17,7 +19,7 @@ pub const Options = struct {
 
     /// @description Where to write generated files.
     /// @short o
-    output: f16 = 0,
+    output: ?u32 = null,
 
     fn deinit(self: *Options) void {
         if (self._arena) |arena|
@@ -30,16 +32,11 @@ pub const Options = struct {
 /// @vektor Generate config and CLI bindings from your command modules.
 /// @example vektor gen
 /// @example vektor gen --config ./src/commands --dry-run
-pub fn run(allocator: Allocator, parser: *Parser) !u8 {
+pub fn run(ctx: *const Ctx, parser: *Parser) !u8 {
     var cfg: Options = .{};
     defer cfg.deinit();
 
-    // TODO pass on the ctx
-    var threaded: std.Io.Threaded = .init(allocator, .{});
-    defer threaded.deinit();
-    const io = threaded.io();
-
-    try parser.parseArguments(Options, allocator, &cfg);
+    try parser.parseArguments(Options, ctx.allocator, &cfg);
 
     const config: ZigValue = .{ .strct = &.{
         .{ .key = "disk", .value = .{ .strct = &.{
@@ -185,7 +182,7 @@ pub fn run(allocator: Allocator, parser: *Parser) !u8 {
         } } },
     } };
 
-    try emit.writeProfile(allocator, io, config, "./src/core/profile.zig");
+    try emit.writeProfile(ctx.allocator, ctx.io, config, "./src/core/profile.zig");
 
     return 0;
 }

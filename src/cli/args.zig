@@ -13,9 +13,7 @@ pub const Parser = struct {
     argIterator: ArgsIterator,
     peeked: ?[]const u8 = null,
 
-    pub const ParserError = error{
-        InvalidValue,
-    };
+    pub const ParserError = error{ InvalidValue, InvalidAction };
 
     pub fn init(args: std.process.Args) Parser {
         var iter = args.iterate();
@@ -53,7 +51,7 @@ pub const Parser = struct {
             if (std.mem.startsWith(u8, arg, "-"))
                 continue;
 
-            return std.meta.stringToEnum(Action, arg) orelse error.InvalidAction;
+            return std.meta.stringToEnum(Action, arg) orelse ParserError.InvalidAction;
         }
 
         return null;

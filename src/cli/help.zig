@@ -1,7 +1,7 @@
 const std = @import("std");
 const cli = @import("cli");
-const vektor = @import("vektor");
 
+const Ctx = cli.Ctx;
 const Allocator = std.mem.Allocator;
 const Parser = cli.Parser;
 const Action = cli.Action;
@@ -9,11 +9,10 @@ const Action = cli.Action;
 /// @vektor Show this help message.
 /// @example vektor help
 /// @example vektor --help
-pub fn run(allocator: Allocator, parser: *Parser) !u8 {
-    _ = allocator;
+pub fn run(ctx: *const Ctx, parser: *Parser) !u8 {
     _ = parser;
 
-    const io = vektor.io();
+    const io = ctx.io;
 
     var buffer: [2048]u8 = undefined;
     var writer = std.Io.File.stdout().writer(io, &buffer);

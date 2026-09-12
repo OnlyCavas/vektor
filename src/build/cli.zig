@@ -266,7 +266,6 @@ fn genActions(allocator: Allocator, cmds: []const CliWalker.Command) ![]const u8
         \\const Self = @This();
         \\
         \\const std = @import("std");
-        \\const vektor = @import("vektor");
         \\const Allocator = std.mem.Allocator;
         \\
         \\const args = @import("args.zig");
@@ -285,6 +284,11 @@ fn genActions(allocator: Allocator, cmds: []const CliWalker.Command) ![]const u8
         \\    name: []const u8,
         \\    short: ?[]const u8 = null,
         \\    description: ?[]const u8 = null,
+        \\};
+        \\
+        \\pub const Ctx = struct {
+        \\    allocator: Allocator,
+        \\    io: std.Io,
         \\};
         \\
         \\var _action: ?Action = null;
@@ -311,15 +315,15 @@ fn genActions(allocator: Allocator, cmds: []const CliWalker.Command) ![]const u8
         \\        return null;
         \\    }
         \\
-        \\    pub fn run(self: Action, allocator: Allocator, io: std.Io, parser: *Parser) !u8 {
+        \\    pub fn run(self: Action, ctx: Ctx, parser: *Parser) !u8 {
         \\        Self._action = self;
         \\
-        \\        return self.runCmd(allocator, parser) catch |err| switch (err) {
+        \\        return self.runCmd(&ctx, parser) catch |err| switch (err) {
         \\            help_error => err: {
         \\                inline for (@typeInfo(Action).@"enum".fields) |cmd| {
         \\                    if (std.mem.eql(u8, cmd.name, @tagName(self))) {
         \\                        var buffer: [1024]u8 = undefined;
-        \\                        var writer = std.Io.File.stdout().writer(io, &buffer);
+        \\                        var writer = std.Io.File.stdout().writer(ctx.io, &buffer);
         \\                        const stdout = &writer.interface;
         \\
         \\                        try stdout.print(
@@ -386,13 +390,13 @@ fn genActions(allocator: Allocator, cmds: []const CliWalker.Command) ![]const u8
         \\
         \\    pub const help_error = error.help_error;
         \\
-        \\    pub fn runCmd(self: Action, allocator: Allocator, parser: *Parser) !u8 {
+        \\    pub fn runCmd(self: Action, ctx: *const Ctx, parser: *Parser) !u8 {
         \\        return switch (self) {
         \\
     );
 
     for (cmds) |cmd| {
-        try wAlloc.writer.print("            .{s} => try {s}.run(allocator, parser),\n", .{ cmd.name, cmd.name });
+        try wAlloc.writer.print("            .{s} => try {s}.run(ctx, parser),\n", .{ cmd.name, cmd.name });
     }
 
     try wAlloc.writer.writeAll(
